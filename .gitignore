@@ -1,0 +1,40 @@
+# Simulation/build artifacts
+build/
+regress/results/
+tests/core/asm/work/
+
+# Synopsys/Verdi generated files
+verdiLog/
+novas.conf
+sim/filelists/verdiLog/
+sim/filelists/novas.conf
+*.fsdb
+*.vcd
+*.vpd
+*.key
+ucli.key
+simv
+simv.daidir/
+csrc/
+
+# Design Compiler generated artifacts
+dc/work/
+dc/outputs/
+dc/reports/
+dc/logs/
+dc/alib-*/
+dc/command.log
+dc/filenames.log
+dc/default.svf
+
+# Tool and editor scratch notes
+codex_txt
+cursor_txt
+
+# Keep third-party or reference PDFs out of the public source commit by default.
+spec/*.pdf
+
+# OS/editor noise
+.DS_Store
+*~
+*.swp
