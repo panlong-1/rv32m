@@ -1,0 +1,46 @@
+TSMC_013 + Design Compiler — open_rv32m (qingteng layout)
+=====================================================
+
+Your PDK `synopsys/` directory contains (corner .db and wireload plib):
+
+  slow.db / typical.db / fast.db / fastz.db
+  slow.lib / typical.lib / fast.lib / fastz.lib / tpz013g3*.lib
+  tsmc13fsg_4lm … tsmc13fsg_8lm  (.pdb / .plib)
+  synopsys_dc.setup
+
+Typical one-liner (max corner — tighten timing; typical — area/QOR trade-off):
+
+  export TSMC013_TARGET_LIB=$HOME/PDK/TSMC_013/synopsys/slow.db
+
+  # or
+  export TSMC013_TARGET_LIB=$HOME/PDK/TSMC_013/synopsys/typical.db
+
+Wire load model (optional — run_dc.tcl tries tsmc13fsg_6lm … 4lm if unset):
+
+  export TSMC013_WLM=tsmc13fsg_6lm
+
+To list valid names inside your .db (in dc_shell after read_db):
+
+  report_lib -wire_load [get_libs]
+
+Optional PDK macro (only if you know it matches your flow; can override libs):
+
+  export TSMC013_SOURCE_PDK_SETUP=1
+
+Synthesis (either):
+
+  cd …/project/open_rv32m
+  source regress/env.sh
+  make -C dc
+
+  # or wrapper (same as make -C dc synth)
+  ./scripts/dc_build.sh
+
+Makefile targets (from repo root, after sourcing env):
+
+  make -C dc help      # usage
+  make -C dc clean    # remove work/outputs/reports/logs artifacts
+
+Outputs: dc/reports/qor.rpt, dc/reports/timing_max.rpt, dc/outputs/rv32im_core_mapped.v
+
+Note: muldiv_unit was updated to use a multi-cycle divider; combinational '/' and '%' are no longer used for DIV/REM.
