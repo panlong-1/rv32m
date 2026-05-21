@@ -34,6 +34,9 @@ cursor_txt
 # Last run_case.sh build directory marker (see scripts/open_rv.sh, shell function t)
 .open_rv32m_last_case_build_dir
 
+# Per-machine path overrides (see scripts/open_rv.local.sh.example)
+scripts/open_rv.local.sh
+
 # Large reference docs (use spec/RV32IM_Current_Implementation.md in git)
 spec/*.pdf
 spec/*.docx

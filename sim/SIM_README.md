@@ -18,15 +18,16 @@ source scripts/open_rv.sh
 # or: source regress/env.sh   # same effect
 ```
 
-Important variables:
+Important variables (see `scripts/open_rv.sh`):
 
 - `RV32M_ROOT` — this repo
-- `TOOLCHAIN` — RISC-V GNU toolchain `bin` directory (if used by your flow)
+- `RV32M_RISCV_TOOLCHAIN_BIN`, `RV32M_RISCV_GNU_PREFIX` — RISC-V GNU toolchain
+- `RV32M_VERILATOR`, `RV32M_VERILATOR_BIN_DIR`, `RV32M_GTKWAVE`
+- `RV32M_VCS_HOME`, `RV32M_VERDI_HOME`, `RV32M_DC_HOME`, `RV32M_SNPSLMD_LICENSE_FILE` (optional)
 - `RV32M_SIMULATOR` — `verilator` (default) or `vcs`
-- Commercial flow: `VCS_HOME`, `VERDI_HOME` / `NOVAS_HOME`, `SNPSLMD_LICENSE_FILE`
 - `RV32M_FILELIST_CORE`, `RV32M_FILELIST_AHB`
 
-**Verilator on older hosts (e.g. CentOS 7):** `verilator_build.sh` may source `devtoolset-11` (or 9/10). You can also `source /opt/rh/devtoolset-11/enable` before building. See `scripts/install_verilator_centos7.sh`.
+**Verilator on older hosts (e.g. CentOS 7):** `verilator_build.sh` may source `devtoolset-11` (or 9/10). You can also `source /opt/rh/devtoolset-11/enable` before building, or set `RV32M_VERILATOR_BIN_DIR`.
 
 ## `sim/Makefile` (optional)
 
@@ -257,7 +258,7 @@ VCD:
 ./scripts/regress.sh --waves
 ```
 
-**GTKWave** (install via distro packages or `scripts/install_gtkwave_centos7.sh`):
+**GTKWave** (install via your distro, or set `RV32M_GTKWAVE` in `scripts/open_rv.sh` / `open_rv.local.sh`):
 
 ```bash
 ./scripts/open_gtkwave.sh smoke
