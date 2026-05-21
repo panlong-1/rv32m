@@ -1,5 +1,5 @@
 # =============================================================================
-# bypass.S — 前递：EX 链、寄存器移位、load→ALU 使用 DBUS 0x2000_0000
+# bypass.S — forwarding: EX chain, register shifts, load→ALU on DBUS 0x2000_0000
 # =============================================================================
   .section .text.init
   .globl _start

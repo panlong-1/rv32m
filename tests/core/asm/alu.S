@@ -1,6 +1,6 @@
 # =============================================================================
-# alu.S — ALU：加减、SLT/SLTU/SLTI/SLTIU、逻辑、桶形移位（I 型与 R 型）
-# 数据基址：无（纯寄存器）；结束：tohost
+# alu.S — ALU: add/sub, SLT/SLTU/SLTI/SLTIU, logic, barrel shifts (I and R types)
+# No memory base (registers only); ends via tohost
 # =============================================================================
   .section .text.init
   .globl _start

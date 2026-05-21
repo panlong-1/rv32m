@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
+# Internal: single AHB case (compile + Verilator/VCS). Do not run directly;
+# use:  scripts/run_case.sh --target ahb [options] <asm.S>
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=rv32m_verdi_pli.inc.sh
 source "$ROOT/scripts/rv32m_verdi_pli.inc.sh"
 export RV32M_ROOT="${RV32M_ROOT:-$ROOT}"
-TOOLCHAIN="${TOOLCHAIN:-/home/ic/project/riscv_toolchain/bin}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$ROOT/.." && pwd)}"
+TOOLCHAIN="${TOOLCHAIN:-$PROJECT_ROOT/riscv_toolchain/bin}"
 PREFIX="${PREFIX:-riscv64-unknown-elf-}"
 SRC="${1:-$ROOT/tests/core/asm/smoke.S}"
 NAME="$(basename "$SRC")"
 NAME="${NAME%.*}"
 BUILD_DIR="${BUILD_DIR:-$ROOT/build/sim/ahb/$NAME}"
+SIMULATOR="${RV32M_SIMULATOR:-verilator}"
 SIMV="$BUILD_DIR/vcs/simv"
+VL_SIM="$BUILD_DIR/verilator/obj_dir/Vtb_rv32im_ahb_top"
 MAX_CYCLES="${MAX_CYCLES:-20000}"
 VCS="${VCS:-vcs}"
 
@@ -19,6 +24,7 @@ if [[ -d "$BUILD_DIR" && "${RV32M_KEEP_BUILD:-0}" != 1 ]]; then
   rm -rf "$BUILD_DIR"
 fi
 mkdir -p "$BUILD_DIR/vcs"
+printf '%s\n' "$BUILD_DIR" >"${RV32M_ROOT:-$ROOT}/.open_rv32m_last_case_build_dir"
 export PATH="$TOOLCHAIN:$PATH"
 
 "${PREFIX}gcc" \
@@ -48,7 +54,16 @@ mapfile -t RTL_FILES < <(
   done < "$ROOT/rtl/filelist.f"
 )
 
-if ! rv32m_verdi_pli_detect; then
+if [[ "$SIMULATOR" == "verilator" ]]; then
+  if [[ "${RUN_FSDB:-}" == 1 ]]; then
+    echo "ERROR: FSDB is not supported with Verilator in this flow; use VCS (RV32M_SIMULATOR=vcs) or omit --fsdb." >&2
+    exit 1
+  fi
+  if [[ "${RV32M_VCS_KDB:-0}" == 1 ]]; then
+    echo "ERROR: --kdb / RV32M_VCS_KDB is only for VCS." >&2
+    exit 1
+  fi
+elif ! rv32m_verdi_pli_detect; then
   if [[ "${RUN_FSDB:-}" == 1 ]]; then
     echo "ERROR: RUN_FSDB=1 but Verdi PLI not found. Set VERDI_HOME (or NOVAS_HOME)." >&2
     exit 1
@@ -58,7 +73,7 @@ fi
 export RV32M_VCS_KDB="${RV32M_VCS_KDB:-0}"
 
 PLUSARGS=(+imem="$BUILD_DIR/${NAME}.hex" +max_cycles="$MAX_CYCLES")
-if [[ "${RUN_FSDB:-}" == 1 ]]; then
+if [[ "${RUN_FSDB:-}" == 1 && "$SIMULATOR" == "vcs" ]]; then
   PLUSARGS+=(+fsdb +fsdbfile="$BUILD_DIR/${NAME}.fsdb")
 fi
 if [[ "${RV32M_WAVE_VCD:-0}" == 1 ]]; then
@@ -75,36 +90,43 @@ if [[ "${RV32M_PC_TRACE:-0}" == 1 ]]; then
   fi
 fi
 
-KDB_FLAGS=()
-if [[ "${RV32M_VCS_KDB:-0}" == 1 ]]; then
-  KDB_FLAGS=(-kdb -debug_access+all -LDFLAGS -rdynamic)
+if [[ "$SIMULATOR" == "verilator" ]]; then
+  export RV32M_VERILATOR_TOP=tb_rv32im_ahb_top
+  VERILATOR_BUILD_DIR="$BUILD_DIR/verilator" "$ROOT/scripts/verilator_build.sh"
+  cd "$BUILD_DIR"
+  "$VL_SIM" "${PLUSARGS[@]}" >"$BUILD_DIR/${NAME}.ahb.sim.log" 2>&1
+else
+  KDB_FLAGS=()
+  if [[ "${RV32M_VCS_KDB:-0}" == 1 ]]; then
+    KDB_FLAGS=(-kdb -debug_access+all -LDFLAGS -rdynamic)
+  fi
+
+  cd "$BUILD_DIR/vcs"
+  rm -rf csrc simv simv.daidir
+  VCS_CMD=(
+    "$VCS" -full64 -sverilog
+    -timescale=1ns/1ps
+    +incdir+"$ROOT/rtl"
+  )
+  ((${#RV32M_FSDB_DEFINE[@]} > 0)) && VCS_CMD+=("${RV32M_FSDB_DEFINE[@]}")
+  VCS_CMD+=("${RTL_FILES[@]}")
+  VCS_CMD+=(
+    "$ROOT/sim/ahb_sram_model.sv"
+    "$ROOT/sim/tb_rv32im_ahb_top.sv"
+    -top tb_rv32im_ahb_top
+  )
+  ((${#RV32M_VCS_PLI[@]} > 0)) && VCS_CMD+=("${RV32M_VCS_PLI[@]}")
+  ((${#KDB_FLAGS[@]} > 0)) && VCS_CMD+=("${KDB_FLAGS[@]}")
+  VCS_CMD+=(-Mdir=csrc -o simv -l "$BUILD_DIR/vcs/compile.log")
+  "${VCS_CMD[@]}"
+
+  if [[ "${RV32M_VCS_KDB:-0}" == 1 ]]; then
+    touch "$BUILD_DIR/vcs/.rv32m_vcs_kdb"
+  fi
+
+  cd "$BUILD_DIR"
+  "$SIMV" "${PLUSARGS[@]}" -l "$BUILD_DIR/${NAME}.ahb.sim.log"
 fi
-
-cd "$BUILD_DIR/vcs"
-rm -rf csrc simv simv.daidir
-VCS_CMD=(
-  "$VCS" -full64 -sverilog
-  -timescale=1ns/1ps
-  +incdir+"$ROOT/rtl"
-)
-((${#RV32M_FSDB_DEFINE[@]} > 0)) && VCS_CMD+=("${RV32M_FSDB_DEFINE[@]}")
-VCS_CMD+=("${RTL_FILES[@]}")
-VCS_CMD+=(
-  "$ROOT/sim/ahb_sram_model.sv"
-  "$ROOT/sim/tb_rv32im_ahb_top.sv"
-  -top tb_rv32im_ahb_top
-)
-((${#RV32M_VCS_PLI[@]} > 0)) && VCS_CMD+=("${RV32M_VCS_PLI[@]}")
-((${#KDB_FLAGS[@]} > 0)) && VCS_CMD+=("${KDB_FLAGS[@]}")
-VCS_CMD+=(-Mdir=csrc -o simv -l "$BUILD_DIR/vcs/compile.log")
-"${VCS_CMD[@]}"
-
-if [[ "${RV32M_VCS_KDB:-0}" == 1 ]]; then
-  touch "$BUILD_DIR/vcs/.rv32m_vcs_kdb"
-fi
-
-cd "$BUILD_DIR"
-"$SIMV" "${PLUSARGS[@]}" -l "$BUILD_DIR/${NAME}.ahb.sim.log"
 
 if grep -Eq 'TIMEOUT|\[FAIL\]|Error:' "$BUILD_DIR/${NAME}.ahb.sim.log"; then
   echo "AHB toolchain test failed; see $BUILD_DIR/${NAME}.ahb.sim.log" >&2
@@ -130,6 +152,6 @@ fi
 if [[ "${RV32M_PC_TRACE:-0}" == 1 ]]; then
   echo "PC_TRACE: ${PC_TRACE_FILE:-$BUILD_DIR/pc_trace.tsv}"
 fi
-if [[ "${RV32M_EMIT_VERDI:-1}" == 1 ]]; then
+if [[ "${RV32M_EMIT_VERDI:-1}" == 1 && "$SIMULATOR" != "verilator" ]]; then
   "$ROOT/scripts/rv32m_emit_open_verdi.sh" "$BUILD_DIR" "$NAME" "$ROOT" "tb_rv32im_ahb_top" "sim/filelists/verdi_ahb.f"
 fi

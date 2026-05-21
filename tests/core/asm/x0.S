@@ -1,6 +1,6 @@
 # =============================================================================
-# x0.S — x0 硬连线：写忽略、读为 0；lw x0 不改变 x0；普通寄存器不受影响
-# DBUS：0x2000_0000
+# x0.S — x0 hardwired: writes ignored, reads as 0; lw x0 does not alter x0; other GPRs unaffected
+# DBUS: 0x2000_0000
 # =============================================================================
   .section .text.init
   .globl _start

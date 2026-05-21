@@ -1,5 +1,5 @@
 # =============================================================================
-# jump.S — JAL / JALR：链接寄存器非零、%hi/%lo 目标地址
+# jump.S — JAL / JALR: link register non-zero, %hi/%lo target addresses
 # =============================================================================
   .section .text.init
   .globl _start

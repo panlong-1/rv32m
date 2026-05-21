@@ -1,5 +1,5 @@
 # =============================================================================
-# imm.S — 立即数：符号扩展 ADDI、xori/ori/andi、slti/sltiu、LUI+分解校验
+# imm.S — immediates: sign-extended ADDI, xori/ori/andi, slti/sltiu, LUI split check
 # =============================================================================
   .section .text.init
   .globl _start

@@ -1,4 +1,10 @@
-// RV32IM 5-stage Harvard core (IBUS/DBUS/SBUS) — spec V3
+// RV32IM five-stage Harvard core (IBUS / DBUS / SBUS). Microarchitecture
+// reference: spec/RV32IM_Current_Implementation.md (internal doc version V3).
+//
+// Stages: IF (pc + imem), ID (decode/regfile), EX (alu / muldiv / branch),
+// MEM (load-store unit), WB (register writeback). Hazard unit handles
+// load-use, mul/div occupancy, and bus stalls; forwarding covers EX/MEM
+// and MEM/WB to EX.
 
 module rv32im_core (
   input  logic        clk,

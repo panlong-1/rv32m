@@ -1,5 +1,5 @@
 # =============================================================================
-# bus_sbus_widths.S — 仅 SBUS：SW/LW、SH/LH/LHU、SB/LB/LBU（半字/字节符号扩展）
+# bus_sbus_widths.S — SBUS only: SW/LW, SH/LH/LHU, SB/LB/LBU (half/byte sign extension)
 # =============================================================================
   .section .text.init
   .globl _start

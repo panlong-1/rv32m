@@ -50,27 +50,36 @@ Current directed cases:
 - `muldiv_stall.S`: dependent consumers after multi-cycle DIV/REM.
 - `hazard.S`: load-use, load-branch, and load-store hazard scenarios.
 
-Run one test:
+## Running tests
+
+From the repository root (with `RV32M_ROOT` and the RISC-V toolchain configured):
 
 ```bash
-cd /home/ic/project/open_rv32m
 ./scripts/run_case.sh tests/core/asm/alu.S
 ./scripts/run_case.sh --target ahb tests/core/asm/sbus.S
 ```
 
-From `sim/` you can use the simulation Makefile:
+With **VCD** for **GTKWave**:
 
 ```bash
-cd /home/ic/project/open_rv32m/sim
+./scripts/run_case.sh --vcd tests/core/asm/alu.S
+./scripts/open_gtkwave.sh alu
+```
+
+From `sim/`:
+
+```bash
+cd sim
 make run CASE=alu
 make ahb CASE=sbus
 make run CASE=smoke PC_TRACE=1
+make run CASE=alu VCD=1
+make gtkwave CASE=alu
 ```
 
-Run regress:
+Regression:
 
 ```bash
-cd /home/ic/project/open_rv32m
 ./scripts/regress.sh
 ./scripts/regress.sh --target ahb
 ```

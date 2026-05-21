@@ -1,25 +1,22 @@
-# open_rv32m Regression
+# open_rv32m regression
 
-回归入口：
+## Entry point
 
 ```bash
-cd /home/ic/project
-source open_rv
-cd open_rv32m
-./scripts/regress.sh
+./scripts/regress.sh [options]
 ```
 
-`scripts/regress.sh` 是 wrapper，实际调用 `regress/bin/run_regress.py`。
+`scripts/regress.sh` is a thin wrapper around `regress/bin/run_regress.py`.
 
-## Target
+## Targets
 
-- `--target core`：默认，使用 `sim/tb_rv32im_top.sv`。
-- `--target ahb`：使用 `sim/tb_rv32im_ahb_top.sv` + `sim/ahb_sram_model.sv`。
-- `--target soc`：预留。
+- `--target core` (default) — `sim/tb_rv32im_top.sv`.
+- `--target ahb` — `sim/tb_rv32im_ahb_top.sv` + `sim/ahb_sram_model.sv`.
+- `--target soc` — reserved.
 
-AHB 模式跳过 `builtin`，其余 asm case 与 core 共用 `regress/cases/core.list`。
+AHB mode skips `builtin`; other asm cases share `regress/cases/core.list` with core.
 
-## 命令
+## Commands
 
 ```bash
 ./scripts/regress.sh
@@ -33,55 +30,48 @@ AHB 模式跳过 `builtin`，其余 asm case 与 core 共用 `regress/cases/core
 ./scripts/regress.sh --trace
 ```
 
-`sim/Makefile` 快捷入口：
+`sim/Makefile` (optional shortcuts to the same scripts):
 
 ```bash
 cd sim
 make regress
-make regress-one CASE=alu
-make regress-ahb REGRESS_CASE=sbus
+make regress REGRESS_CASE=alu
+make regress TARGET=ahb REGRESS_CASE=sbus
 make regress PC_TRACE=1 FSDB=1
 ```
 
-## Case List
+## Case list
 
-默认：
+Default file:
 
 ```text
 regress/cases/core.list
 ```
 
-格式：
+Line format:
 
 ```text
 name type source max_cycles
 ```
 
-类型：
+Types:
 
-- `builtin`：core testbench 内置自检。
-- `asm`：编译 `tests/core/asm/*.S` 并通过 `+imem=<hex>` 加载。
+- `builtin` — self-check inside the core testbench.
+- `asm` — compile `tests/core/asm/*.S` and load with `+imem=<hex>`.
 
-`max_cycles` 是 watchdog，不是正常 PASS/FAIL 判断。case 应主动写 `0xF0000000`：
+`max_cycles` is a watchdog only. Pass/fail uses write to **`0xF000_0000`**: `1` = pass, non-1 = fail.
 
-```text
-1       PASS
-non-1   FAIL/error flag
-```
-
-## 输出
+## Outputs
 
 ```text
 regress/results/YYYYMMDD_HHMMSS/
   summary.rpt
   open_verdi.sh
-  core/
-    <case>/
-  ahb/
-    <case>/
+  core/<case>/...
+  ahb/<case>/...
 ```
 
-每个 case：
+Per case:
 
 ```text
 <case>/
@@ -94,19 +84,15 @@ regress/results/YYYYMMDD_HHMMSS/
   <case>.vcd               # --waves
   pc_trace.tsv             # --pc-trace
   run_case.log
-  vcs/
-    simv
-    compile.log
-    csrc/
-    simv.daidir/
+  vcs/...
   open_verdi.sh
 ```
 
-`summary.rpt`：
+`summary.rpt` is CSV:
 
 ```text
 case,status,detail
-smoke,PASS,/home/ic/project/open_rv32m/regress/results/.../core/smoke
+smoke,PASS,<path under regress/results/.../core/smoke>
 ```
 
 ## Verdi
@@ -115,20 +101,9 @@ smoke,PASS,/home/ic/project/open_rv32m/regress/results/.../core/smoke
 regress/results/<run>/open_verdi.sh <case>
 ```
 
-或：
+or:
 
 ```bash
 cd regress/results/<run>/core/smoke
 ./open_verdi.sh
-```
-
-## 最近验证
-
-```text
-core: /home/ic/project/open_rv32m/regress/results/20260513_080708
-  builtin + 19 asm PASS
-
-AHB:  /home/ic/project/open_rv32m/regress/results/20260513_080752
-  builtin SKIP
-  19 asm PASS
 ```

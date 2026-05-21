@@ -1,12 +1,12 @@
 # =============================================================================
-# smoke.S — 最小冒烟：ALU 依赖、MUL、算术右移、JAL/JALR 与 tohost
-# 通过条件：仿真 log 含 [PASS] tohost；失败写 tohost=2 后自旋
+# smoke.S — minimal smoke: ALU deps, MUL, arithmetic right shift, JAL/JALR, tohost
+# PASS: sim log shows tohost PASS; FAIL: writes tohost=2 then spins
 # =============================================================================
   .section .text.init
   .globl _start
 
 _start:
-  # ADDI 链依赖前递
+  # ADDI chain exercises forwarding
   addi x1, x0, 5
   addi x2, x1, 3
   addi x3, x0, 8
@@ -18,18 +18,18 @@ _start:
   addi x7, x0, 12
   bne  x6, x7, fail
 
-  # 算术右移（负数）
+  # Arithmetic right shift (negative operand)
   addi x9, x0, -8
   srai x10, x9, 1
   addi x11, x0, -4
   bne  x10, x11, fail
 
-  # JAL 保存返回地址；子程序用 x19，返回后比对
+  # JAL saves return address; callee uses x19, check after return
   jal  x1, subr
   addi x18, x0, 9
   bne  x19, x18, fail
 
-# PASS：tohost 写 1
+# PASS: write 1 to tohost
 pass:
   lui  x20, 0xF0000
   addi x21, x0, 1
@@ -37,7 +37,7 @@ pass:
 1:
   jal  x0, 1b
 
-# FAIL：tohost 写 2
+# FAIL: write 2 to tohost
 fail:
   lui  x20, 0xF0000
   addi x21, x0, 2

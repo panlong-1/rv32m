@@ -1,5 +1,5 @@
 # =============================================================================
-# sbus.S — SBUS（0x4000_0000）：SW/LW、SB/LBU（走 addr_decode use_sbus）
+# sbus.S — SBUS (0x4000_0000): SW/LW, SB/LBU (via addr_decode use_sbus)
 # =============================================================================
   .section .text.init
   .globl _start

@@ -31,10 +31,27 @@ dc/default.svf
 codex_txt
 cursor_txt
 
-# Keep third-party or reference PDFs out of the public source commit by default.
+# Last run_case.sh build directory marker (see scripts/open_rv.sh, shell function t)
+.open_rv32m_last_case_build_dir
+
+# Large reference docs (use spec/RV32IM_Current_Implementation.md in git)
 spec/*.pdf
+spec/*.docx
 
 # OS/editor noise
 .DS_Store
 *~
 *.swp
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+# Verilator / C++ build debris (if ever outside build/)
+obj_dir/
+
+# IDEs
+.idea/
+.vscode/

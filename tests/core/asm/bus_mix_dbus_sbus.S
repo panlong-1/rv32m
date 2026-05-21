@@ -1,6 +1,6 @@
 # =============================================================================
-# bus_mix_dbus_sbus.S — DBUS(0x20000000) 与 SBUS(0x40000000) 交替访存
-# 目的：LSU 路由 + 双总线与 IBUS stall/hazard 交互（AHB 多口仿真常用）
+# bus_mix_dbus_sbus.S — interleaved DBUS(0x20000000) and SBUS(0x40000000) traffic
+# Goal: LSU routing + dual-bus vs IBUS stall/hazard (typical multi-port AHB sim stress)
 # =============================================================================
   .section .text.init
   .globl _start
