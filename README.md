@@ -72,13 +72,113 @@ source scripts/open_rv.sh
 
 Legacy names `TOOLCHAIN`, `PREFIX`, `VCS_HOME` are still set automatically for existing scripts.
 
-If you keep a clone next to other projects and prefer to run **`source open_rv`** from the **parent** directory (e.g. `project/`), a thin **`open_rv`** there can forward to this script; the canonical file remains **`open_rv32m/scripts/open_rv.sh`**.
+If you keep a clone next to other projects and prefer to run **`source open_rv`** from the **parent** directory (e.g. `project/`), a thin **`open_rv`** there can forward to this script; the canonical file remains **`scripts/open_rv.sh`**.
 
 Equivalent from anywhere inside the tree:
 
 ```bash
 source regress/env.sh
 ```
+
+## Switching tools
+
+Always **`source scripts/open_rv.sh`** first so paths and `PATH` are set. Tool choice is then a mix of **environment variables** (session-wide) and **`run_case.sh` / `regress.sh` flags** (per run).
+
+### 1. RISC-V toolchain (compile asm tests)
+
+Set in `scripts/open_rv.local.sh` or export before `source`:
+
+```bash
+export RV32M_RISCV_TOOLCHAIN_BIN=/path/to/riscv/bin   # must contain ${PREFIX}gcc
+export RV32M_RISCV_GNU_PREFIX=riscv64-unknown-elf-    # or riscv32-unknown-elf-, riscv-none-embed-
+source scripts/open_rv.sh
+```
+
+Check: `command -v ${PREFIX}gcc` and `${PREFIX}gcc -march=rv32im -mabi=ilp32 --version`.
+
+### 2. HDL simulator (Verilator vs VCS)
+
+| Goal | One-shot (single case) | Whole shell session |
+|------|------------------------|---------------------|
+| **Verilator** (default, open source) | `./scripts/run_case.sh tests/core/asm/smoke.S` | `export RV32M_SIMULATOR=verilator` |
+| **VCS** (Synopsys) | `./scripts/run_case.sh --sim vcs tests/core/asm/smoke.S` | `export RV32M_SIMULATOR=vcs` |
+
+Point VCS/Verdi at your install before `source` (paths in [Environment](#environment)):
+
+```bash
+export RV32M_VCS_HOME=/opt/synopsys/vcs/...
+export RV32M_VERDI_HOME=/opt/synopsys/verdi/...
+export RV32M_SNPSLMD_LICENSE_FILE=27000@license-server
+source scripts/open_rv.sh
+```
+
+Verilator binary search order: `RV32M_VERILATOR` → optional `RV32M_VERILATOR_BIN_DIR` on `PATH` → system `verilator`.
+
+From `sim/Makefile`: `make run CASE=smoke SIM=verilator` or `make run CASE=smoke SIM=vcs`.
+
+### 3. DUT target (core vs AHB)
+
+| Target | Top module | Single case | Regression |
+|--------|------------|-------------|------------|
+| **core** (default) | `rv32im_core` / `tb_rv32im_top` | `./scripts/run_case.sh tests/core/asm/smoke.S` | `./scripts/regress.sh` |
+| **ahb** | `rv32im_ahb_top` / `tb_rv32im_ahb_top` | `./scripts/run_case.sh --target ahb tests/core/asm/sbus.S` | `./scripts/regress.sh --target ahb` |
+
+Session default: `export RV32M_TARGET=ahb` (used by `run_case.sh` when `--target` is omitted).
+
+Makefile: `make run CASE=smoke` vs `make ahb CASE=sbus`, or `make regress TARGET=ahb`.
+
+### 4. Waveforms and debug
+
+| Output | Simulator | Command |
+|--------|-----------|---------|
+| **VCD** + GTKWave | Verilator or VCS | `./scripts/run_case.sh --vcd tests/core/asm/smoke.S` then `./scripts/open_gtkwave.sh smoke` |
+| **FSDB** + Verdi | **VCS only** | `./scripts/run_case.sh --sim vcs --fsdb tests/core/asm/hazard.S` |
+| **PC trace** TSV | either | `./scripts/run_case.sh --pc-trace tests/core/asm/smoke.S` |
+
+GTKWave: set `RV32M_GTKWAVE` if the binary is not named `gtkwave` on your `PATH`.
+
+After a VCS run: `cd build/sim/core/<case> && ./open_verdi.sh`.
+
+Regression with waves: `./scripts/regress.sh --waves` (VCD) or `./scripts/regress.sh --fsdb` (needs `--sim vcs` / `RV32M_SIMULATOR=vcs`).
+
+### 5. Synthesis (Design Compiler, optional)
+
+Not used for RTL sim. Requires `RV32M_DC_HOME` and `TSMC013_TARGET_LIB` (or your `.db`) in the environment, then:
+
+```bash
+source scripts/open_rv.sh
+make -C dc
+# or: ./scripts/dc_build.sh
+```
+
+### Quick reference (copy-paste)
+
+```bash
+# Open-source flow (default)
+source scripts/open_rv.sh
+./scripts/run_case.sh --vcd tests/core/asm/smoke.S
+
+# VCS + FSDB + AHB
+export RV32M_SIMULATOR=vcs
+./scripts/run_case.sh --target ahb --fsdb tests/core/asm/sbus.S
+
+# Custom RISC-V toolchain for one session
+export RV32M_RISCV_TOOLCHAIN_BIN=$HOME/riscv/bin
+export RV32M_RISCV_GNU_PREFIX=riscv64-unknown-elf-
+source scripts/open_rv.sh
+./scripts/regress.sh --case alu
+```
+
+| Variable / flag | Values | Effect |
+|-----------------|--------|--------|
+| `RV32M_RISCV_TOOLCHAIN_BIN` | path to `bin` | Asm compile |
+| `RV32M_RISCV_GNU_PREFIX` | e.g. `riscv64-unknown-elf-` | Tool names |
+| `RV32M_SIMULATOR` / `--sim` | `verilator`, `vcs` | Simulator |
+| `RV32M_TARGET` / `--target` | `core`, `ahb` | DUT / TB |
+| `--vcd` / `--waves` | flag | VCD dump |
+| `--fsdb` | flag | FSDB (VCS) |
+| `--pc-trace` | flag | `pc_trace.tsv` |
+| `RV32M_VCS_HOME`, `RV32M_VERDI_HOME` | Synopsys roots | VCS/Verdi on `PATH` |
 
 ## Primary entry points
 
