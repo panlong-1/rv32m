@@ -73,7 +73,7 @@ done
 STEM="${1:-smoke}"
 
 if ! command -v "$GTKWAVE" >/dev/null 2>&1; then
-  echo "ERROR: '$GTKWAVE' not in PATH. Install GTKWave (see scripts/install_gtkwave_centos7.sh)." >&2
+  echo "ERROR: '$GTKWAVE' not in PATH. Install GTKWave (distro package or set RV32M_GTKWAVE)." >&2
   exit 127
 fi
 

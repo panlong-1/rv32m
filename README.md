@@ -1,6 +1,6 @@
 # rv32m
 
-Open-source **RV32I + M-extension** five-stage in-order Harvard core (no CSRs/traps/C extension). Verilator-first simulation with optional Synopsys VCS/Verdi/DC. with directed assembly tests, regression automation, and **Verilator** as the default simulator. Optional **Synopsys VCS / Verdi** (FSDB, KDB) and **Design Compiler** flows are supported when those tools are installed. Waveforms: **VCD + GTKWave** on any platform; FSDB when using VCS.
+Open-source **RV32I + M-extension** five-stage in-order Harvard core (no CSRs/traps/C extension). Verilator-first simulation with directed asm tests, regression automation, and optional Synopsys VCS/Verdi/DC. Waveforms: **VCD + GTKWave**; FSDB when using VCS.
 
 ## Highlights
 
@@ -54,13 +54,23 @@ After sourcing, **`scripts/` is on `PATH`**: you can run `run_case.sh`, `regress
 
 When a case finishes, run **`t`** in the same shell to **`cd` into that case’s build directory** (ELF/HEX/log/VCD, etc.). The path is stored in `$RV32M_LAST_CASE_DIR_FILE` (default `$RV32M_ROOT/.open_rv32m_last_case_build_dir`).
 
-Override site-specific variables **before** sourcing if your install paths differ, for example:
+Set paths **before** `source`, or copy `scripts/open_rv.local.sh.example` → `scripts/open_rv.local.sh` (gitignored):
+
+| Variable | Purpose |
+|----------|---------|
+| `RV32M_RISCV_TOOLCHAIN_BIN` | RISC-V `gcc`/`objdump` directory |
+| `RV32M_RISCV_GNU_PREFIX` | Tool prefix, e.g. `riscv64-unknown-elf-` |
+| `RV32M_VERILATOR` / `RV32M_VERILATOR_BIN_DIR` | Verilator (default sim) |
+| `RV32M_VCS_HOME` / `RV32M_VERDI_HOME` / `RV32M_DC_HOME` | Optional Synopsys tools |
+| `RV32M_SNPSLMD_LICENSE_FILE` | Synopsys license (if needed) |
 
 ```bash
-export VCS_HOME=/opt/synopsys/vcs/...
-export TOOLCHAIN=/opt/riscv/bin
+export RV32M_RISCV_TOOLCHAIN_BIN=/home/ic/project/riscv_toolchain/bin
+export RV32M_VCS_HOME=/opt/synopsys/vcs/...
 source scripts/open_rv.sh
 ```
+
+Legacy names `TOOLCHAIN`, `PREFIX`, `VCS_HOME` are still set automatically for existing scripts.
 
 If you keep a clone next to other projects and prefer to run **`source open_rv`** from the **parent** directory (e.g. `project/`), a thin **`open_rv`** there can forward to this script; the canonical file remains **`open_rv32m/scripts/open_rv.sh`**.
 
