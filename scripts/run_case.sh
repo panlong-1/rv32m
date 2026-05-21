@@ -11,6 +11,8 @@ Usage:
 
 Options:
   --target core|ahb     Simulation target (default: core)
+  --sim vcs|verilator   HDL simulator (default: verilator). On CentOS 7 use
+                        devtoolset (scripts/verilator_build.sh tries it) or set CXX.
   --fsdb                Dump FSDB waveform
   --vcd                 Dump VCD waveform
   --trace               Enable testbench trace plusarg
@@ -23,12 +25,14 @@ Options:
   -h, --help            Show this help
 
 Output:
-  build/sim/<target>/<case>/ by default, containing ELF/HEX/DUMP, VCS files,
-  simulation log, optional FSDB/VCD, and open_verdi.sh.
+  build/sim/<target>/<case>/ by default, containing ELF/HEX/DUMP, simulator
+  build (verilator/ or vcs/), simulation log, optional FSDB/VCD, and open_verdi.sh
+  when using VCS.
 EOF
 }
 
 TARGET="${RV32M_TARGET:-core}"
+SIMULATOR="${RV32M_SIMULATOR:-verilator}"
 SRC=""
 
 while (($#)); do
@@ -39,6 +43,14 @@ while (($#)); do
       ;;
     --target=*)
       TARGET="${1#*=}"
+      shift
+      ;;
+    --sim)
+      SIMULATOR="${2:?missing value for --sim}"
+      shift 2
+      ;;
+    --sim=*)
+      SIMULATOR="${1#*=}"
       shift
       ;;
     --fsdb)
@@ -117,10 +129,12 @@ SRC="${SRC:-$ROOT/tests/core/asm/smoke.S}"
 
 case "$TARGET" in
   core)
-    exec "$ROOT/scripts/toolchain_test.sh" "$SRC"
+    export RV32M_SIMULATOR="$SIMULATOR"
+    exec "$ROOT/scripts/internal/run_core_sim.sh" "$SRC"
     ;;
   ahb)
-    exec "$ROOT/scripts/ahb_toolchain_test.sh" "$SRC"
+    export RV32M_SIMULATOR="$SIMULATOR"
+    exec "$ROOT/scripts/internal/run_ahb_sim.sh" "$SRC"
     ;;
   *)
     echo "ERROR: --target must be core or ahb, got: $TARGET" >&2

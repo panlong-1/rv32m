@@ -1,4 +1,4 @@
-# Source from vcs_build.sh / ahb_toolchain_test.sh (bash).
+# Sourced from vcs_build.sh and scripts/internal/*_sim.sh (bash).
 # Detects Synopsys Verdi / Novas VCS PLI for FSDB ($fsdbDump*).
 # On success sets: RV32M_VCS_PLI=( -P <novas.tab> <pli.a> ) and RV32M_FSDB_DEFINE=( +define+RV32M_FSDB )
 

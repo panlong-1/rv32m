@@ -1,340 +1,185 @@
-# open_rv32m
+# rv32m
 
-`open_rv32m` 与 `rv32m` 同源，是面向**开源仿真 / 综合工具链**的工程副本（目录名 `open_rv32m`，**独立 Git**）。当前仍以 SystemVerilog RV32IM 五级流水 RTL、VCS/Verdi、DC 为主；后续可在此目录演进 Verilator、Icarus 等流程，而不影响 `rv32m/`。当前重点：RTL 仿真、core/AHB directed case、回归自动化、FSDB/Verdi 调试、基础 DC 综合。
+Open-source **RV32I + M-extension** five-stage in-order Harvard core (no CSRs/traps/C extension). Verilator-first simulation with optional Synopsys VCS/Verdi/DC. with directed assembly tests, regression automation, and **Verilator** as the default simulator. Optional **Synopsys VCS / Verdi** (FSDB, KDB) and **Design Compiler** flows are supported when those tools are installed. Waveforms: **VCD + GTKWave** on any platform; FSDB when using VCS.
 
-## 当前状态
+## Highlights
 
-- ISA：RV32I 子集 + RV32M 乘除法。
-- 流水线：IF / ID / EX / MEM / WB。
-- 总线：Harvard 风格 `IBUS`、`DBUS`、`SBUS`，并提供 AHB 顶层封装。
-- 仿真：VCS。
-- 波形：VCD / FSDB，FSDB 通过 Verdi VCS PLI。
-- 调试：每个 case 自动生成独立仿真目录和 `open_verdi.sh`。
-- PC 轨迹：testbench 直接写 `pc_trace.tsv`，不依赖波形解析。
-- 性能统计：asm case PASS 时打印 cycles、指令数、IPC、指令类型、stall/flush 和总线访问计数。
-- 回归：core 和 AHB 均支持同一批 asm case。
+- **ISA:** RV32I subset + RV32M (`MUL*` single-cycle; `DIV`/`REM*` multi-cycle).
+- **Pipeline:** IF / ID / EX / MEM / WB.
+- **Buses:** Harvard `IBUS`, `DBUS`, `SBUS`; optional **AHB-Lite** wrapper (`rv32im_ahb_top`).
+- **Simulation:** **Verilator** (default); **VCS** via `RV32M_SIMULATOR=vcs` or `./scripts/run_case.sh --sim vcs`.
+- **Waves:** VCD from Verilator/VCS; open with **GTKWave** (`scripts/open_gtkwave.sh`, `make gtkwave`). FSDB only with VCS + Verdi PLI.
+- **PC trace:** testbench writes `pc_trace.tsv` (no waveform parsing required).
+- **Performance:** on PASS, logs `[PERF]` lines (cycles, instr, IPC, opcode mix, stalls/flushes, bus counts).
+- **Regression:** same assembly list for core and AHB targets.
 
-最近一次验证：
+## Quick start (Verilator + GTKWave)
 
-```text
-core regress: /home/ic/project/open_rv32m/regress/results/20260513_080708
-  builtin + 19 asm: PASS
+Prerequisites: **Verilator**, **RISC-V GNU toolchain** (`riscv32-unknown-elf-gcc` or the prefix you configure), and optionally **GTKWave**.
 
-AHB regress:  /home/ic/project/open_rv32m/regress/results/20260513_080752
-  builtin: SKIP
-  19 asm: PASS
+1. Clone this repository and load the environment (see [Environment](#environment)).
+2. Run a smoke test:
 
-performance smoke:
-  core: /home/ic/project/open_rv32m/regress/results/20260513_173555
-  AHB:  /home/ic/project/open_rv32m/regress/results/20260513_173617
-  4 perf asm: PASS
-```
+   ```bash
+   ./scripts/run_case.sh tests/core/asm/smoke.S
+   ```
 
-## 目录架构
+3. Re-run with VCD and open waves:
 
-```text
-/home/ic/project/
-  open_rv                    本仓库环境入口：source open_rv
-  riscv_toolchain/           RISC-V bare-metal toolchain
-  open_rv32m/
-    README.md                项目总览和标准流程
-    rtl/
-      *.sv                   CPU RTL
-      filelist.f             VCS RTL filelist，使用 $RV32M_ROOT 路径
-    sim/
-      Makefile               仿真快捷入口
-      SIM_README.md          仿真、波形、PC trace、Verdi 细节
-      tb_rv32im_top.sv       core testbench
-      tb_rv32im_ahb_top.sv   AHB testbench
-      ahb_sram_model.sv      AHB SRAM 模型
-      filelists/
-        verdi_core.f
-        verdi_ahb.f
-    tests/core/
-      README.md
-      link.ld
-      asm/
-        *.S
-        test_macros.inc      PASS/FAIL tohost 宏
-    scripts/
-      run_case.sh            单 case 统一入口
-      regress.sh             regress wrapper
-      toolchain_test.sh      core 单 case 兼容入口
-      ahb_toolchain_test.sh  AHB 单 case 兼容入口
-      vcs_build.sh
-    regress/
-      README.md
-      env.sh                 兼容入口，内部 source /home/ic/project/open_rv
-      cases/core.list        core/AHB 共用 case list
-      bin/run_regress.py
-      results/
-    build/sim/               单 case 输出
-    dc/
-    spec/
-```
+   ```bash
+   ./scripts/run_case.sh --vcd tests/core/asm/smoke.S
+   ./scripts/open_gtkwave.sh smoke
+   ```
 
-## 环境
+   Or from `sim/`: `make run CASE=smoke VCD=1` then `make gtkwave CASE=smoke`.
 
-每次进入项目建议先执行：
+4. Full core regression:
+
+   ```bash
+   ./scripts/regress.sh
+   ```
+
+More detail: [sim/SIM_README.md](sim/SIM_README.md), [regress/README.md](regress/README.md), [tests/core/README.md](tests/core/README.md), [spec/RV32IM_Current_Implementation.md](spec/RV32IM_Current_Implementation.md).
+
+## Environment
+
+The supported way to configure paths is **`scripts/open_rv.sh`**. It lives in this repo, sets **`RV32M_ROOT`** from the script location (unless you already exported it), sets **`PROJECT_ROOT`** to the parent of the repo (default place for a sibling **`riscv_toolchain`**), prepends toolchain and optional Synopsys `bin` dirs to **`PATH`**, and exports **`RV32M_FILELIST_CORE`** / **`RV32M_FILELIST_AHB`**.
 
 ```bash
-cd /home/ic/project
-source open_rv
 cd open_rv32m
+source scripts/open_rv.sh
 ```
 
-`source open_rv` 会设置 `RV32M_ROOT`（指向本目录）、`TOOLCHAIN`、`PREFIX`、`VCS_HOME`、`VERDI_HOME`、`NOVAS_HOME`、`DC_HOME`、`SNPSLMD_LICENSE_FILE`、`RV32M_FILELIST_CORE`、`RV32M_FILELIST_AHB`。
+After sourcing, **`scripts/` is on `PATH`**: you can run `run_case.sh`, `regress.sh`, `open_gtkwave.sh`, etc. without `./scripts/…`.
 
-兼容旧习惯：
+When a case finishes, run **`t`** in the same shell to **`cd` into that case’s build directory** (ELF/HEX/log/VCD, etc.). The path is stored in `$RV32M_LAST_CASE_DIR_FILE` (default `$RV32M_ROOT/.open_rv32m_last_case_build_dir`).
+
+Override site-specific variables **before** sourcing if your install paths differ, for example:
 
 ```bash
-cd /home/ic/project/open_rv32m
+export VCS_HOME=/opt/synopsys/vcs/...
+export TOOLCHAIN=/opt/riscv/bin
+source scripts/open_rv.sh
+```
+
+If you keep a clone next to other projects and prefer to run **`source open_rv`** from the **parent** directory (e.g. `project/`), a thin **`open_rv`** there can forward to this script; the canonical file remains **`open_rv32m/scripts/open_rv.sh`**.
+
+Equivalent from anywhere inside the tree:
+
+```bash
 source regress/env.sh
 ```
 
-`regress/env.sh` 现在只是 wrapper，会 source `/home/ic/project/open_rv`。
+## Primary entry points
 
-## 标准入口
+| Task | Command |
+|------|---------|
+| Single case | `./scripts/run_case.sh` |
+| Regression | `./scripts/regress.sh` |
 
-只推荐记两条入口：
+`sim/Makefile` and `tests/core/asm/Makefile` are optional shortcuts; they only invoke the same two scripts.
 
-```text
-单 case： ./scripts/run_case.sh
-回归：    ./scripts/regress.sh
-```
-
-`sim/Makefile` 只是薄封装，不另起流程。
-
-## 单 Case 仿真
+## Single-case simulation
 
 ```bash
-# core
+# Core DUT
 ./scripts/run_case.sh tests/core/asm/smoke.S
 
-# AHB
+# AHB top
 ./scripts/run_case.sh --target ahb tests/core/asm/sbus.S
 
-# 常用调试
-./scripts/run_case.sh --fsdb tests/core/asm/hazard.S
+# VCD (GTKWave)
+./scripts/run_case.sh --vcd tests/core/asm/smoke.S
+./scripts/open_gtkwave.sh smoke
+
+# FSDB / Verdi (VCS only)
+./scripts/run_case.sh --sim vcs --fsdb tests/core/asm/hazard.S
 ./scripts/run_case.sh --pc-trace tests/core/asm/smoke.S
-./scripts/run_case.sh --target ahb --fsdb --pc-trace tests/core/asm/sbus.S
 ```
 
-默认输出：
+Default build layout:
 
 ```text
 build/sim/core/<case>/
 build/sim/ahb/<case>/
 ```
 
-单 case 默认重建输出目录。需要保留旧目录：
+To keep an existing build directory instead of wiping it:
 
 ```bash
 RV32M_KEEP_BUILD=1 ./scripts/run_case.sh tests/core/asm/smoke.S
 ```
 
-## sim/Makefile
+## Optional: `sim/Makefile` shortcuts
+
+The canonical commands are **`./scripts/run_case.sh`** and **`./scripts/regress.sh`**. From `sim/`, `make` only forwards to those scripts (same flags as environment variables):
 
 ```bash
-cd /home/ic/project/open_rv32m/sim
-
+cd sim
 make run CASE=smoke
 make ahb CASE=sbus
-make run CASE=smoke FSDB=1 PC_TRACE=1
-make regress-one CASE=alu
-make regress-ahb REGRESS_CASE=sbus PC_TRACE=1
+make run CASE=smoke VCD=1
+make gtkwave CASE=smoke
+make regress
+make regress REGRESS_CASE=alu          # one case (passes --case alu)
+make regress TARGET=ahb                # AHB full list
 make list
 make env
 ```
 
-常用变量：
+Useful variables: `TARGET=core|ahb`, `CASE=<asm stem>`, `ASM=<path.S>`, `SIM=verilator|vcs`, `FSDB=1`, `VCD=1`, `TRACE=1`, `PC_TRACE=1`, `MAX_CYCLES=N`, `BUILD_DIR=...`, `REGRESS_CASE=<name>`.
 
-```text
-TARGET=core|ahb
-CASE=<tests/core/asm 下的文件 stem>
-ASM=<显式 .S 路径>
-FSDB=1 VCD=1 TRACE=1 PC_TRACE=1 PC_TRACE_EACH_CYCLE=1 KDB=1
-MAX_CYCLES=N BUILD_DIR=<dir> PC_TRACE_FILE=<file>
-REGRESS_CASE=<case>
-```
+`tests/core/asm/Makefile` is a tiny forwarder for **core** cases only; prefer `./scripts/run_case.sh` from the repo root.
 
-## 回归
+## Regression
 
 ```bash
-# core 全量
-./scripts/regress.sh
-
-# AHB 全量
-./scripts/regress.sh --target ahb
-
-# 单 case
+./scripts/regress.sh                    # core, full list
+./scripts/regress.sh --target ahb       # AHB (skips core-only builtin)
 ./scripts/regress.sh --case alu
-./scripts/regress.sh --target ahb --case sbus
-
-# 波形/PC trace
-./scripts/regress.sh --fsdb
-./scripts/regress.sh --waves
+./scripts/regress.sh --waves            # VCD per case
 ./scripts/regress.sh --pc-trace
-
-# 性能小基准
-./scripts/regress.sh --case perf_alu_chain --case perf_branch_loop \
-  --case perf_loadstore_loop --case perf_mul_loop
-./scripts/regress.sh --target ahb --case perf_alu_chain --case perf_branch_loop \
-  --case perf_loadstore_loop --case perf_mul_loop
 ```
 
-case list：
+Case list: `regress/cases/core.list`.
 
-```text
-regress/cases/core.list
-```
+Performance micro-benchmarks (also in the default list): `perf_alu_chain`, `perf_branch_loop`, `perf_loadstore_loop`, `perf_mul_loop`.
 
-这个 list 同时供 core 和 AHB 使用。AHB 模式跳过 `builtin`，跑所有 asm case。
+## Test termination (tohost)
 
-性能 case 已加入默认 list：
+Assembly tests signal PASS/FAIL by writing **`0xF000_0000`**:
 
-```text
-perf_alu_chain       依赖 ALU 链，观察普通数据相关和分支开销
-perf_branch_loop     紧分支循环，观察 taken branch / flush 开销
-perf_loadstore_loop  DBUS load/store 循环，观察访存 stall
-perf_mul_loop        RV32M multiply 循环，观察 M 扩展吞吐
-```
+- `1` → PASS (`$finish` success)
+- any other value → FAIL
 
-每个 asm case PASS 前会打印三行 `[PERF]`：
+`max_cycles` is only a watchdog.
 
-```text
-[PERF] cycles=<N> instr=<N> ipc=<N>
-[PERF] type alu=<N> load=<N> store=<N> branch=<N> branch_taken=<N> jump=<N> muldiv=<N> lui_auipc=<N>
-[PERF] stall if=<N> id=<N> ex=<N> flush=<N> dbus_r=<N> dbus_w=<N> sbus_r=<N> sbus_w=<N>
-```
+## Outputs
 
-`instr` 的口径是 testbench 观察到的有效非 NOP 指令进入 EX，作为当前 in-order core 的 retired 近似值；被 flush 的指令不计入。
+Single case under `build/sim/<target>/<case>/`: ELF, HEX, disassembly, log, optional VCD/FSDB, `pc_trace.tsv`, Verilator `obj_dir/` or VCS `simv`, helper `open_verdi.sh` when applicable.
 
-回归输出：
+Regression under `regress/results/<timestamp>/`: `summary.rpt`, per-case trees mirroring the layout above.
 
-```text
-regress/results/YYYYMMDD_HHMMSS/
-  summary.rpt
-  open_verdi.sh
-  core/<case>/
-  ahb/<case>/
-```
+## Optional: Verdi
 
-## Case 终止机制
-
-asm case 不靠仿真时间判断 PASS/FAIL，而是主动写固定地址：
-
-```text
-TOHOST_ADDR = 0xF0000000
-write 1     = PASS
-write != 1  = FAIL/error flag
-```
-
-core/AHB testbench 都会监控该地址，看到写入后立即 `$finish`。`MAX_CYCLES` 只是 watchdog。
-
-新增 asm case 建议：
-
-```asm
-  .include "tests/core/asm/test_macros.inc"
-
-pass:
-  RVTEST_PASS
-
-fail:
-  RVTEST_FAIL
-```
-
-## 产物目录
-
-单 case：
-
-```text
-build/sim/<target>/<case>/
-  <case>.elf
-  <case>.hex
-  <case>.dump
-  <case>.sim.log 或 <case>.ahb.sim.log
-  <case>.fsdb       # 使用 FSDB 时
-  <case>.vcd        # 使用 VCD 时
-  pc_trace.tsv      # 使用 PC_TRACE 时
-  vcs/
-    simv
-    compile.log
-    csrc/
-    simv.daidir/
-  open_verdi.sh
-```
-
-回归：
-
-```text
-regress/results/<timestamp>/<target>/<case>/
-  同单 case 目录结构
-  run_case.log
-```
-
-## Verdi
+From a case directory that already ran with VCS/FSDB or VCD:
 
 ```bash
-# 单 case
 cd build/sim/core/smoke
 ./open_verdi.sh
-
-# 回归
-regress/results/<timestamp>/open_verdi.sh smoke
 ```
 
-filelist 使用环境相关路径：
+Filelists: use `$RV32M_FILELIST_CORE` / `$RV32M_FILELIST_AHB` with tops `tb_rv32im_top` / `tb_rv32im_ahb_top`.
+
+## Optional: Design Compiler
 
 ```bash
-verdi -nologo -sv -f "$RV32M_FILELIST_CORE" -top tb_rv32im_top
-verdi -nologo -sv -f "$RV32M_FILELIST_AHB"  -top tb_rv32im_ahb_top
-```
-
-`open_verdi.sh` 会自动加载对应 top、filelist、`vcs/simv.daidir`、FSDB/VCD。
-
-## PC Trace
-
-```bash
-./scripts/run_case.sh --pc-trace tests/core/asm/smoke.S
-./scripts/regress.sh --case smoke --pc-trace
-```
-
-输出 `pc_trace.tsv`：
-
-```text
-time_ps  pc_hex  ibus_inst_hex  if_id_pc_hex  if_id_inst_hex
-```
-
-后续做 Keil 式工具时，可以用 ELF/objdump 地址对齐 `pc_hex` 或 `if_id_pc_hex`。
-
-## Design Compiler
-
-```bash
-source /home/ic/project/open_rv
-cd /home/ic/project/open_rv32m
 make -C dc
+# or: ./scripts/dc_build.sh
 ```
 
-或：
+See `dc/` for logs, reports, and mapped netlist paths (ignored from git by default).
 
-```bash
-./scripts/dc_build.sh
-```
+## License
 
-主要输出：
-
-```text
-dc/logs/dc.log
-dc/reports/qor.rpt
-dc/reports/timing_max.rpt
-dc/reports/area.rpt
-dc/outputs/rv32im_core_mapped.v
-```
-
-## 子文档
-
-- 仿真细节：[sim/SIM_README.md](sim/SIM_README.md)
-- 回归细节：[regress/README.md](regress/README.md)
-- directed case：[tests/core/README.md](tests/core/README.md)
-- 当前实现说明：[spec/RV32IM_Current_Implementation.md](spec/RV32IM_Current_Implementation.md)
+[LICENSE](LICENSE) is provided as **MIT** for open redistribution. If this core is derived from or must comply with another policy at your site, replace or supplement that file accordingly.

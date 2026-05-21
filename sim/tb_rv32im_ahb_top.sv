@@ -1,4 +1,5 @@
 `timescale 1ns / 1ps
+// Self-checking testbench for rv32im_ahb_top (three AHB-Lite masters + SRAM).
 module tb_rv32im_ahb_top;
   logic hclk;
   logic hresetn;

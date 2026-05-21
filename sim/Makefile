@@ -1,9 +1,12 @@
+# Optional shortcuts — canonical commands live in ../scripts/
+#   ./scripts/run_case.sh …        ./scripts/regress.sh …
 SHELL := /usr/bin/env bash
 
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 THIS_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
 ROOT         := $(abspath $(MAKEFILE_DIR)/..)
-PROJECT_ROOT := $(abspath $(ROOT)/..)
+
+SIM ?= verilator
 
 TARGET ?= core
 CASE   ?= smoke
@@ -26,9 +29,10 @@ REGRESS_CASE ?=
 
 RUN_CASE := $(ROOT)/scripts/run_case.sh
 REGRESS  := $(ROOT)/scripts/regress.sh
-ENV_SH   := $(PROJECT_ROOT)/rv
+ENV_SH   := $(ROOT)/scripts/open_rv.sh
 
 RUN_OPTS := --target $(TARGET)
+RUN_OPTS += --sim $(SIM)
 RUN_OPTS += $(if $(filter 1,$(FSDB)),--fsdb)
 RUN_OPTS += $(if $(filter 1,$(VCD)),--vcd)
 RUN_OPTS += $(if $(filter 1,$(TRACE)),--trace)
@@ -40,6 +44,7 @@ RUN_OPTS += $(if $(MAX_CYCLES),--max-cycles $(MAX_CYCLES))
 RUN_OPTS += $(if $(BUILD_DIR),--build-dir $(BUILD_DIR))
 
 REGRESS_OPTS := --target $(TARGET)
+REGRESS_OPTS += --sim $(SIM)
 REGRESS_OPTS += $(if $(REGRESS_CASE),--case $(REGRESS_CASE))
 REGRESS_OPTS += $(if $(filter 1,$(FSDB)),--fsdb)
 REGRESS_OPTS += $(if $(filter 1,$(VCD)),--waves)
@@ -49,40 +54,28 @@ REGRESS_OPTS += $(if $(filter 1,$(PC_TRACE_EACH_CYCLE)),--pc-trace-each-cycle)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help env run core ahb regress regress-core regress-ahb regress-one list verdi clean clean-results
+.PHONY: help env run core ahb regress list verdi gtkwave clean clean-results
 
 help:
-	@echo "open_rv32m sim Makefile"
+	@echo "Shortcuts only — use scripts from the repo root when possible:"
+	@echo "  $(ROOT)/scripts/run_case.sh [opts] tests/core/asm/<case>.S"
+	@echo "  $(ROOT)/scripts/regress.sh [opts]"
 	@echo
-	@echo "Single case:"
-	@echo "  make run CASE=smoke                  # core, tests/core/asm/smoke.S"
-	@echo "  make ahb CASE=sbus                   # AHB single case"
-	@echo "  make ahb CASE=load_store             # alias for loadstore.S"
-	@echo "  make run ASM=/abs/path/foo.S         # explicit asm source"
-	@echo "  make run CASE=smoke FSDB=1 PC_TRACE=1"
-	@echo
-	@echo "Regression:"
-	@echo "  make regress                         # core full regression"
-	@echo "  make regress-one CASE=alu            # core one case"
-	@echo "  make regress-ahb REGRESS_CASE=sbus   # AHB one case"
-	@echo
-	@echo "Useful variables:"
-	@echo "  TARGET=core|ahb  CASE=<stem>  ASM=<file.S>  REGRESS_CASE=<name>"
-	@echo "  CASE aliases: load_store -> loadstore"
-	@echo "  FSDB=1 VCD=1 TRACE=1 PC_TRACE=1 PC_TRACE_EACH_CYCLE=1 KDB=1"
-	@echo "  MAX_CYCLES=N BUILD_DIR=<dir> PC_TRACE_FILE=<file>"
-	@echo
-	@echo "Other:"
-	@echo "  make list                            # list asm cases"
-	@echo "  make verdi CASE=smoke TARGET=core    # open last single-case Verdi helper"
-	@echo "  make clean                           # remove build/sim/{core,ahb}"
-	@echo "  make clean-results                   # remove regress/results"
+	@echo "This Makefile forwards to those scripts:"
+	@echo "  make run CASE=smoke              # core single case"
+	@echo "  make ahb CASE=sbus               # AHB (load_store aliases to loadstore)"
+	@echo "  make regress                     # full regress for TARGET (default core)"
+	@echo "  make regress REGRESS_CASE=alu    # one case (--case alu)"
+	@echo "  make regress TARGET=ahb          # AHB regress"
+	@echo "  SIM=verilator|vcs  FSDB=1 VCD=1  PC_TRACE=1  KDB=1  MAX_CYCLES=N  BUILD_DIR=…"
+	@echo "  make list   make env   make verdi   make gtkwave   make clean   make clean-results"
 
 env:
 	@source "$(ENV_SH)" >/dev/null; \
 	echo "RV32M_ROOT=$$RV32M_ROOT"; \
+	echo "VERILATOR=$$(command -v verilator || true)"; \
 	echo "VCS=$$(command -v vcs || true)"; \
-	echo "VERDI=$$(command -v verdi || true)"; \
+	echo "GTKWAVE=$$(command -v gtkwave || true)"; \
 	echo "TOOLCHAIN=$$TOOLCHAIN"; \
 	echo "SNPSLMD_LICENSE_FILE=$$SNPSLMD_LICENSE_FILE"
 
@@ -110,15 +103,6 @@ regress:
 	echo "+ $(REGRESS) $(REGRESS_OPTS)"; \
 	"$(REGRESS)" $(REGRESS_OPTS)
 
-regress-core:
-	@$(MAKE) --no-print-directory -f "$(THIS_MAKEFILE)" regress TARGET=core
-
-regress-ahb:
-	@$(MAKE) --no-print-directory -f "$(THIS_MAKEFILE)" regress TARGET=ahb
-
-regress-one:
-	@$(MAKE) --no-print-directory -f "$(THIS_MAKEFILE)" regress REGRESS_CASE="$(CASE_CANON)"
-
 list:
 	@find "$(ROOT)/tests/core/asm" -maxdepth 1 -name '*.S' -printf '%f\n' | sort
 
@@ -130,6 +114,11 @@ verdi:
 	fi; \
 	cd "$$case_dir"; \
 	exec ./open_verdi.sh
+
+gtkwave:
+	@source "$(ENV_SH)" >/dev/null; \
+	cd "$(ROOT)"; \
+	exec ./scripts/open_gtkwave.sh --target "$(TARGET)" "$(CASE_CANON)"
 
 clean:
 	rm -rf "$(ROOT)/build/sim/core" "$(ROOT)/build/sim/ahb"

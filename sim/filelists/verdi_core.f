@@ -1,4 +1,4 @@
-// Verdi / nWave: source /home/ic/project/open_rv first.
+// Verdi / nWave: source scripts/open_rv.sh from the open_rv32m repo first.
 //   verdi -nologo -sv -f $RV32M_FILELIST_CORE -top tb_rv32im_top
 // Optional wave: -vcd <path>.vcd  or  -ssf <path>.fsdb
 // Optional KDB (when built with RV32M_VCS_KDB=1): -dbdir <path>/simv.daidir

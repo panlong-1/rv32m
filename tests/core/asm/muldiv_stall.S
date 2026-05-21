@@ -1,5 +1,5 @@
 # =============================================================================
-# muldiv_stall.S — 多周期 DIV/REM 后与立即数/乘法混用（stall + 前递）
+# muldiv_stall.S — after multi-cycle DIV/REM mix immediates/MUL (stall + forwarding)
 # =============================================================================
   .section .text.init
   .globl _start

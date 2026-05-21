@@ -1,6 +1,6 @@
 # =============================================================================
-# flush.S — 控制流冲刷：始终 taken 分支、JAL 槽位无效指令、JALR 返回
-# 期望：延迟槽/flush 后 x1 未被中间指令污染
+# flush.S — control-flow flush: always-taken branch, bogus JAL delay slot, JALR return
+# Expect: x1 not clobbered by slot/flush sequence
 # =============================================================================
   .section .text.init
   .globl _start

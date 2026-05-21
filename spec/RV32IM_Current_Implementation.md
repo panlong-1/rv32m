@@ -326,7 +326,7 @@ The local TSMC 0.13 µm setup is expected to use:
 
 ```bash
 export TSMC013_TARGET_LIB=$HOME/PDK/TSMC_013/synopsys/slow.db
-cd /home/ic/project/open_rv32m
+cd open_rv32m   # or your clone path
 ./scripts/dc_build.sh
 ```
 

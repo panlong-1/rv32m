@@ -1,5 +1,5 @@
 # =============================================================================
-# branch.S — 条件分支：BEQ/BNE/BLT/BGE/BLTU/BGEU 的 taken / not-taken
+# branch.S — conditional branches: BEQ/BNE/BLT/BGE/BLTU/BGEU taken and not-taken
 # =============================================================================
   .section .text.init
   .globl _start

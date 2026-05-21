@@ -1,5 +1,5 @@
 # =============================================================================
-# muldiv.S — RV32M：MULH/MULHU/MULHSU、DIV/REM 有符号、DIVU/REMU、除零、溢出角例
+# muldiv.S — RV32M: MULH/MULHU/MULHSU, signed DIV/REM, DIVU/REMU, divide-by-zero, overflow edges
 # =============================================================================
   .section .text.init
   .globl _start

@@ -1,5 +1,5 @@
 # =============================================================================
-# compare_edges.S — 比较与分支角例：0x80000000、-1 与 slt/sltu/blt/bge/bltu/bgeu
+# compare_edges.S — compare/branch edges: 0x80000000, -1 vs slt/sltu/blt/bge/bltu/bgeu
 # =============================================================================
   .section .text.init
   .globl _start

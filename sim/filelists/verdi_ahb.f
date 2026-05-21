@@ -1,4 +1,4 @@
-// Verdi: source /home/ic/project/open_rv first.
+// Verdi: source scripts/open_rv.sh from the open_rv32m repo first.
 //   verdi -nologo -sv -f $RV32M_FILELIST_AHB -top tb_rv32im_ahb_top
 
 +incdir+$RV32M_ROOT/rtl

@@ -1,5 +1,5 @@
 # =============================================================================
-# loadstore.S — DBUS（0x2000_0000）：SW/LW、LB/LBU、LH/LHU、SB/SH 对齐访存
+# loadstore.S — DBUS (0x2000_0000): SW/LW, LB/LBU, LH/LHU, SB/SH aligned accesses
 # =============================================================================
   .section .text.init
   .globl _start

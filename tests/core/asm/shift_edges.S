@@ -1,5 +1,5 @@
 # =============================================================================
-# shift_edges.S — 移位边界：slli 31、srli/srai、变量移位量低 5 位（40→8）
+# shift_edges.S — shift edges: slli 31, srli/srai, variable shift low 5 bits (40→8)
 # =============================================================================
   .section .text.init
   .globl _start

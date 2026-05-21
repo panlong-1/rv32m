@@ -1,5 +1,5 @@
 # =============================================================================
-# bus_ibus_dbus_fill.S — 连续 ADDI 拉长取指段，再对 DBUS 多字 SW/LW（IF/MEM 重叠压力）
+# bus_ibus_dbus_fill.S — long ADDI fetch run then multi-word DBUS SW/LW (IF/MEM overlap stress)
 # =============================================================================
   .section .text.init
   .globl _start

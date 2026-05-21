@@ -1,12 +1,12 @@
 # =============================================================================
-# hazard.S — 冒险：load-use（ALU/分支）、窄访存符号/零扩展、load→store 前递
-# DBUS 基址：0x2000_0000（非 SBUS）
+# hazard.S — hazards: load-use (ALU/branch), narrow load sign/zero extend, load→store forwarding
+# DBUS base: 0x2000_0000 (not SBUS)
 # =============================================================================
   .section .text.init
   .globl _start
 
 _start:
-  lui  x3, 0x20000        # DBUS 数据区基址
+  lui  x3, 0x20000        # DBUS data region base
 
   # lw -> add immediate consumer
   addi x1, x0, 42
