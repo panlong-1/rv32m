@@ -1,0 +1,2 @@
++stall_ibus_during_mem_write=16
++max_cycles=25000

@@ -264,6 +264,8 @@ Bus-overlap / replay hazard cases (sibling `tests/core/asm/<case>.plusargs`):
 - `hazard_branch_mem_stall` — branch in EX while SBUS store stalls MEM
 - `hazard_ibus_store_dup` — IBUS not-ready during store in MEM
 - `hazard_sbus_replay_smoke` — IBUS stall during one SBUS store; non-idempotent peripheral model
+- `hazard_ibus_insn_dup` — IBUS stall after store; ID/EX must not duplicate into EX/MEM (BYG-006 guard)
+- `hazard_sbus_rx_replay_smoke` — IBUS stall during UART RBR read; `+replay_expect_rbr=1` (BYG-005)
 
 Focused lists: `regress/cases/deep_hazard.list`, `regress/cases/periph_replay.list`.
 
