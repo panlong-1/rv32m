@@ -1,4 +1,10 @@
-// Hazard / pipeline control (spec §10–11)
+// Hazard / pipeline control (spec §9)
+//
+// Bus-interaction fixes (2026-05):
+//   Bug1 — flush is suppressed while stall_mem is active so a taken branch in EX
+//          is not cleared before PC can take the target after DBUS/SBUS stall.
+//   Bug2 — front-end stall always freezes ID/EX; IBUS stall holds EX/MEM instead
+//          of bubbling a completed beat (pairs with rv32im_core mem_wb gating).
 module hazard_unit (
   input  logic        id_ex_mem_read,
   input  logic [4:0]  id_ex_rd,
@@ -80,7 +86,9 @@ module hazard_unit (
   assign sbus_done = sbus_ready && (sbus_valid || sbus_valid_stall);
 
   always_comb begin
-    flush       = ex_branch_taken;
+    // Do not flush while MEM is stalled: PC is frozen and clearing ID/EX would
+    // drop the branch before the target is captured (Bug1: branch+mem stall).
+    flush       = ex_branch_taken && !stall_mem;
     stall_pc    = 1'b0;
     stall_if_id = 1'b0;
     stall_id_ex = 1'b0;
@@ -105,14 +113,16 @@ module hazard_unit (
     end else if (stall_front) begin
       stall_pc     = 1'b1;
       stall_if_id  = 1'b1;
-      // IBUS not-ready must not freeze ID/EX while a store is in MEM on SBUS/DBUS;
-      // otherwise the store beat can never handshake cleanly with this core/bridge.
-      if (!(ex_mem_mem_write && ibus_stall && !div_busy))
-        stall_id_ex = 1'b1;
+      // Always stall ID/EX on front-end stall (removed IBUS+store hack that let
+      // ID/EX advance while IF/ID was frozen and duplicated the ID instruction).
+      stall_id_ex  = 1'b1;
       if (!dbus_done && !sbus_done) begin
         // If ID/EX is frozen by the front-end stall, keep EX/MEM from
         // re-capturing the same instruction after a completed beat was bubbled.
         stall_ex_mem = (dbus_valid || sbus_valid || stall_id_ex);
+      end else if (ibus_stall) begin
+        // Hold EX/MEM during IBUS back-pressure (avoid bubble_ex_mem re-issue).
+        stall_ex_mem = 1'b1;
       end else begin
         bubble_ex_mem = 1'b1;
       end

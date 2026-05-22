@@ -216,7 +216,7 @@ Target generation:
 - Branch/JAL: `id_ex_pc + id_ex_imm`
 - JALR: `(rs1 + imm) & 32'hFFFF_FFFE`
 
-Taken branches and jumps flush IF/ID and ID/EX.
+Taken branches and jumps flush IF/ID and ID/EX when the pipeline is not stalled on that stage.
 
 ## 8. Memory Stage
 
@@ -250,15 +250,29 @@ Misaligned access exceptions are not implemented. The current logic selects byte
 - load-use bubble insertion when ID/EX is a load used by IF/ID
 - IBUS wait-state stall
 - DBUS/SBUS wait-state stall
-- branch/jump flush
-- `div_busy` input, although current `muldiv_unit.busy` is tied low
+- branch/jump flush (`flush = ex_branch_taken && !stall_mem`)
+- `div_busy` from multi-cycle divide in EX
 
 Priority in the current combinational hazard logic is:
 
-1. Flush on taken branch/jump
-2. MEM bus stall or `div_busy`
+1. MEM bus stall or `div_busy` (full pipeline hold; **no flush** while active)
+2. Taken branch/jump flush (only when not in item 1)
 3. ID/EX load-use bubble
-4. Front-end stall
+4. Front-end stall (`ibus_stall`, load-use overlap with `div_busy`, etc.)
+   - `stall_id_ex` is always asserted in item 4
+   - If the pending DBUS/SBUS beat is not done: hold EX/MEM
+   - Else if `ibus_stall`: hold EX/MEM (do not `bubble_ex_mem`; avoids re-retiring the same EX op after IBUS wait)
+   - Else: bubble EX/MEM for a completed beat while the front end is stalled
+
+`rv32im_core` complements the hazard unit:
+
+- IF/ID and ID/EX flush only when `flush && !stall_if_id` / `flush && !stall_id_ex`
+- MEM/WB captures EX/MEM only when `!stall_ex_mem && !bubble_ex_mem` (no writeback on bubble cycles)
+
+Directed bus-overlap tests (require testbench plusargs in `tests/core/asm/*.plusargs`):
+
+- `hazard_branch_mem_stall.S` — taken branch in EX while SBUS store stalls MEM (`+stall_sbus_writes`)
+- `hazard_ibus_store_dup.S` — IBUS stall during store in MEM (`+stall_ibus_during_mem_write`)
 
 The core also includes a WB-to-ID register read bypass in `rv32im_core`. This models write-first register file behavior for same-cycle writeback/decode dependencies and avoids X propagation when an instruction in ID reads the register being written in WB.
 
@@ -300,6 +314,10 @@ Toolchain-driven assembly tests currently cover:
 - directed ALU add/sub/logic/compare/shift behavior (`tests/core/asm/alu.S`)
 - RV32M multiply/divide/remainder including corner cases (`tests/core/asm/muldiv.S`)
 - load-use, load-branch, byte/halfword load extension, and load-to-store-data hazards (`tests/core/asm/hazard.S`)
+- branch flush vs MEM bus stall (`tests/core/asm/hazard_branch_mem_stall.S`)
+- IBUS stall vs store / ID/EX freeze (`tests/core/asm/hazard_ibus_store_dup.S`)
+
+Core Verilator regression (`regress/cases/core.list`): **26** cases (builtin + 21 asm + 4 perf).
 
 Current observed result:
 

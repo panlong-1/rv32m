@@ -251,7 +251,14 @@ Useful variables: `TARGET=core|ahb`, `CASE=<asm stem>`, `ASM=<path.S>`, `SIM=ver
 ./scripts/regress.sh --pc-trace
 ```
 
-Case list: `regress/cases/core.list`.
+Case list: `regress/cases/core.list` (**26** cases: builtin + 21 asm + 4 perf).
+
+Bus-overlap hazard cases (need sibling `tests/core/asm/<case>.plusargs` for TB stall injection):
+
+- `hazard_branch_mem_stall` — branch in EX while SBUS store stalls MEM
+- `hazard_ibus_store_dup` — IBUS not-ready during store in MEM
+
+Focused list: `regress/cases/deep_hazard.list`.
 
 Performance micro-benchmarks (also in the default list): `perf_alu_chain`, `perf_branch_loop`, `perf_loadstore_loop`, `perf_mul_loop`.
 

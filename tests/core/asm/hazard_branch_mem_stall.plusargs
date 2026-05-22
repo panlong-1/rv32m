@@ -1,0 +1,3 @@
+# Stretch first SBUS store so MEM stall overlaps taken branch in EX
++stall_sbus_writes=12
++max_cycles=25000

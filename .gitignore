@@ -31,6 +31,9 @@ dc/default.svf
 codex_txt
 cursor_txt
 
+# Local AI / status context (not for GitHub)
+AI_DEV_CONTEXT.local.md
+
 # Last run_case.sh build directory marker (see scripts/open_rv.sh, shell function t)
 .open_rv32m_last_case_build_dir
 

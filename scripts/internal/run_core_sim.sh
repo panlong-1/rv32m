@@ -61,7 +61,24 @@ else
   VCS_BUILD_DIR="$BUILD_DIR/vcs" OUT="$SIMV" "$ROOT/scripts/vcs_build.sh"
 fi
 
+CASE_PLUSARGS="$ROOT/tests/core/asm/${NAME}.plusargs"
+PLUSARGS_EXTRA=()
+if [[ -f "$CASE_PLUSARGS" ]]; then
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"
+    line="$(echo "$line" | xargs)"
+    [[ -z "$line" ]] && continue
+    if [[ "$line" =~ ^\+max_cycles=([0-9]+)$ ]]; then
+      MAX_CYCLES="${BASH_REMATCH[1]}"
+      continue
+    fi
+    PLUSARGS_EXTRA+=("$line")
+  done <"$CASE_PLUSARGS"
+fi
 PLUSARGS=(+imem="$BUILD_DIR/${NAME}.hex" +max_cycles="$MAX_CYCLES")
+if [[ ${#PLUSARGS_EXTRA[@]} -gt 0 ]]; then
+  PLUSARGS+=("${PLUSARGS_EXTRA[@]}")
+fi
 if [[ "${RUN_FSDB:-}" == 1 && "$SIMULATOR" == "vcs" ]]; then
   PLUSARGS+=(+fsdb +fsdbfile="$BUILD_DIR/${NAME}.fsdb")
 fi

@@ -1,0 +1,5 @@
+# Deep pipeline / bus-interaction hazard cases (require *.plusargs in tests/core/asm/).
+# Expect PASS only after hazard_unit RTL fixes for branch+mem stall and IBUS/store overlap.
+# Run: ./scripts/regress.sh --case-list regress/cases/deep_hazard.list
+hazard_branch_mem_stall asm tests/core/asm/hazard_branch_mem_stall.S 20000
+hazard_ibus_store_dup asm tests/core/asm/hazard_ibus_store_dup.S 20000

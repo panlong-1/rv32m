@@ -16,6 +16,12 @@
 
 AHB mode skips `builtin`; other asm cases share `regress/cases/core.list` with core.
 
+Bus-overlap hazard subset (same asm sources, optional plusargs loaded by `run_case.sh`):
+
+```bash
+./scripts/regress.sh --case-list regress/cases/deep_hazard.list
+```
+
 ## Commands
 
 ```bash

@@ -64,7 +64,8 @@ module rv32im_core (
       if_id_pc    <= 32'd0;
       if_id_inst  <= NOP_INSTR;
       if_id_pc_p4 <= 32'd4;
-    end else if (flush) begin
+    // Honor stall_if_id before flush: clearing IF/ID during a stall loses state.
+    end else if (flush && !stall_if_id) begin
       if_id_pc    <= 32'd0;
       if_id_inst  <= NOP_INSTR;
       if_id_pc_p4 <= 32'd0;
@@ -200,7 +201,8 @@ module rv32im_core (
       id_ex_is_lui    <= 1'b0;
       id_ex_is_auipc  <= 1'b0;
       id_ex_is_jalr   <= 1'b0;
-    end else if (flush) begin
+    // Honor stall_id_ex before flush (branch+mem stall, Bug1 companion).
+    end else if (flush && !stall_id_ex) begin
       id_ex_pc        <= 32'd0;
       id_ex_pc_p4     <= 32'd0;
       id_ex_imm       <= 32'd0;
@@ -535,7 +537,9 @@ module rv32im_core (
       mem_wb_mem       <= 32'd0;
       mem_wb_wb_sel    <= 2'b00;
       mem_wb_pc_p4     <= 32'd0;
-    end else if (!stall_ex_mem) begin
+    // Do not retire EX/MEM on a bubble cycle: ex_mem is cleared in the same
+    // edge, but the pre-bubble value would otherwise be written again (Bug2).
+    end else if (!stall_ex_mem && !bubble_ex_mem) begin
       mem_wb_reg_write <= ex_mem_reg_write;
       mem_wb_rd        <= ex_mem_rd;
       mem_wb_alu       <= ex_mem_alu;
