@@ -21,13 +21,26 @@ Default case lists (no `--case-list` needed):
 | `core` (legacy list) | `regress/cases/core.list` |
 | `ahb` (legacy list) | `regress/cases/ahb.list` |
 
-TORV full regression is `soc.list` (31 asm cases). Legacy `builtin` in old lists is skipped/removed.
+TORV full regression is **`regress/cases/soc.list`** (32 asm cases). Legacy `builtin` in old lists is skipped/removed.
+
+On successful full regress, `regress/results/<stamp>/perf_summary.csv` is generated automatically.
+
+```bash
+./scripts/perf_summary.py                              # latest results dir
+./scripts/perf_summary.py regress/results/<stamp> --csv out.csv
+```
 
 Optional subsets:
 
 ```bash
-./scripts/regress.sh --case-list regress/cases/deep_hazard.list
+./scripts/regress.sh --case-list regress/cases/deep_hazard.list   # 6 hazard cases
 ./scripts/regress.sh --target ahb --case-list regress/cases/periph_replay.list
+```
+
+Directed dup checks (PC trace + x1 writeback count):
+
+```bash
+./scripts/check_hazard_dup_trace.py --case hazard_ibus_insn_dup --run
 ```
 
 Third-party IP (SoCBUS + PULP UART) is fetched automatically on first AHB run via `scripts/fetch_ip.sh`.

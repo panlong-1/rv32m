@@ -209,6 +209,16 @@ def main() -> int:
     print(f"Verdi helper: {result_dir / 'open_verdi.sh'} <case>")
     if args.fsdb:
         print("FSDB: see regress/results/.../<target>/<case>/<case>.fsdb")
+    perf_script = root / "scripts" / "perf_summary.py"
+    if perf_script.is_file() and not failed:
+        perf_csv = result_dir / "perf_summary.csv"
+        run(
+            [sys.executable, str(perf_script), str(result_dir), "--csv", str(perf_csv)],
+            root,
+            result_dir / "perf_summary.log",
+            env,
+        )
+        print(f"PERF CSV: {perf_csv}")
     return 1 if failed else 0
 
 

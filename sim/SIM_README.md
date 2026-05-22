@@ -265,7 +265,9 @@ Used by `tests/periph/apb_uart_sv/*.plusargs` (replay / UART smoke):
 | `+pc_trace_file=<path>` | Output path (default `pc_trace.tsv`) |
 | `+pc_trace_each_cycle` | Every cycle; **without** it, log only when **PC changes** |
 
-Columns (tab-separated): `time_ps`, `pc_hex`, `ibus_inst_hex`, `if_id_pc_hex`, `if_id_inst_hex`.
+Columns (tab-separated): `time_ps`, `pc_hex`, `ibus_inst_hex`, `if_id_pc_hex`, `if_id_inst_hex`, `wb_we`, `wb_rd`, `wb_wdata_hex` (WB fields are the MEM/WB stage in that cycle).
+
+Use `scripts/check_hazard_dup_trace.py` on directed hazard cases to count `x1` writebacks without opening a waveform.
 
 Example (from the case directory):
 
