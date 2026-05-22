@@ -8,7 +8,7 @@ ROOT         := $(abspath $(MAKEFILE_DIR)/..)
 
 SIM ?= verilator
 
-TARGET ?= core
+TARGET ?= soc
 CASE   ?= smoke
 CASE_CANON := $(CASE)
 CASE_CANON := $(patsubst load_store,loadstore,$(CASE_CANON))

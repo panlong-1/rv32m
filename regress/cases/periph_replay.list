@@ -1,0 +1,4 @@
+# AHB memory-replay vs PULP UART TX FIFO (expect FAIL on unfixed RTL for replay_div_store)
+uart_smoke asm tests/periph/apb_uart_sv/uart_smoke.S 5000
+replay_ibus_store asm tests/periph/apb_uart_sv/replay_ibus_store.S 5000
+replay_div_store asm tests/periph/apb_uart_sv/replay_div_store.S 25000

@@ -1,0 +1,2 @@
+# PULP UART @ 0x4000_0000 (AHB target only)
+uart_smoke asm tests/periph/apb_uart_sv/uart_smoke.S 5000

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verilator — build rv32im simulation (--top tb_rv32im_top or tb_rv32im_ahb_top).
+# Verilator — build TORV SoC simulation (tb_torv_soc).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export RV32M_ROOT="${RV32M_ROOT:-$ROOT}"
@@ -30,7 +30,7 @@ rv32m_verilator_pick_cxx
 
 VERILATOR="${VERILATOR:-verilator}"
 VERILATOR_BUILD_DIR="${VERILATOR_BUILD_DIR:-$ROOT/build/sim/core/verilator}"
-TOP="${RV32M_VERILATOR_TOP:-tb_rv32im_top}"
+TOP="${RV32M_VERILATOR_TOP:-tb_torv_soc}"
 
 mkdir -p "$VERILATOR_BUILD_DIR"
 rm -rf "$VERILATOR_BUILD_DIR/obj_dir"
@@ -52,16 +52,23 @@ while IFS= read -r file; do
   RTL_FILES+=("$(rv32m_resolve_filelist_path "$file")")
 done < "$ROOT/rtl/filelist.f"
 
-EXTRA_SV=()
-if [[ "$TOP" == "tb_rv32im_ahb_top" ]]; then
-  EXTRA_SV+=("$ROOT/sim/ahb_sram_model.sv" "$ROOT/sim/tb_rv32im_ahb_top.sv")
-else
-  EXTRA_SV+=("$ROOT/sim/tb_rv32im_top.sv")
+IP_FILES=()
+if [[ -f "$ROOT/ip/filelist.f" ]]; then
+  while IFS= read -r file; do
+    [[ -z "$file" || "$file" =~ ^[[:space:]]*# ]] && continue
+    IP_FILES+=("$(rv32m_resolve_filelist_path "$file")")
+  done < "$ROOT/ip/filelist.f"
+fi
+
+EXTRA_SV=("$ROOT/sim/tb_torv_soc.sv")
+if [[ "$TOP" != "tb_torv_soc" ]]; then
+  echo "ERROR: RV32M_VERILATOR_TOP must be tb_torv_soc (got $TOP)" >&2
+  exit 2
 fi
 
 cd "$VERILATOR_BUILD_DIR"
 
-: >"$VERILATOR_BUILD_DIR/verilator.log"
+: >verilator.log
 VL_CMD=(
   "$VERILATOR" --binary --timing --trace
   -Wno-fatal
@@ -70,14 +77,16 @@ VL_CMD=(
   -CFLAGS "-std=c++17"
   --top-module "$TOP"
   -I"$ROOT/rtl"
+  -I"$ROOT/ip/third_party/socbus/include"
   -O1
   "${RTL_FILES[@]}"
+  "${IP_FILES[@]}"
   "${EXTRA_SV[@]}"
   -o "V${TOP}"
   -MAKEFLAGS "CXX=${CXX:-g++}"
 )
 
-echo "${VL_CMD[*]}" >>"$VERILATOR_BUILD_DIR/verilator.log"
-"${VL_CMD[@]}" >>"$VERILATOR_BUILD_DIR/verilator.log" 2>&1
+echo "${VL_CMD[*]}" >>verilator.log
+"${VL_CMD[@]}" >>verilator.log 2>&1
 
 echo "Build OK: $VERILATOR_BUILD_DIR/obj_dir/V${TOP}"

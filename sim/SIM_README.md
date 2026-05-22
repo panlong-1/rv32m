@@ -71,8 +71,9 @@ Examples:
 # Core, FSDB (VCS + Verdi)
 ./scripts/run_case.sh --sim vcs --fsdb tests/core/asm/hazard.S
 
-# AHB, FSDB
+# AHB, FSDB (core asm or periph asm)
 ./scripts/run_case.sh --sim vcs --target ahb --fsdb tests/core/asm/sbus.S
+./scripts/run_case.sh --target ahb tests/periph/apb_uart_sv/uart_smoke.S
 
 # Custom output directory
 ./scripts/run_case.sh --sim vcs --target ahb --fsdb \
@@ -92,13 +93,12 @@ Typical contents:
 <case>.elf
 <case>.hex
 <case>.dump
-<case>.sim.log           # core
-<case>.ahb.sim.log       # AHB
+<case>.sim.log           # TORV SoC
 <case>.fsdb              # with --fsdb
 <case>.vcd               # with --vcd
 verilator/
   obj_dir/
-    Vtb_rv32im_top       # or Vtb_rv32im_ahb_top executable
+    Vtb_torv_soc
   verilator.log
 vcs/
   simv
@@ -111,7 +111,7 @@ run_case.log             # when invoked from regress
 
 ### `run_case.sh` options
 
-- `--target core|ahb` — core TB vs AHB top TB.
+- `--target soc` — TORV SoC (default). `core|ahb` are legacy aliases.
 - `--sim verilator|vcs` — default `verilator`; FSDB/`--kdb` need VCS.
 - `--fsdb` — FSDB (VCS only).
 - `--vcd` — VCD.
@@ -137,15 +137,24 @@ Examples:
 ./scripts/regress.sh
 ./scripts/regress.sh --case alu
 ./scripts/regress.sh --sim vcs --fsdb
-./scripts/regress.sh --sim vcs --target ahb --case sbus --fsdb
+./scripts/regress.sh --sim vcs --case sbus --fsdb
 ./scripts/regress.sh --case smoke --pc-trace
 ./scripts/regress.sh --case perf_alu_chain --case perf_branch_loop \
   --case perf_loadstore_loop --case perf_mul_loop
-./scripts/regress.sh --target ahb --case perf_alu_chain --case perf_branch_loop \
+./scripts/regress.sh --case perf_alu_chain --case perf_branch_loop \
   --case perf_loadstore_loop --case perf_mul_loop
 ```
 
-Case list: `regress/cases/core.list`.
+Case lists (default when `--case-list` omitted):
+
+| `--target` | Default list |
+|------------|----------------|
+| `soc` | `regress/cases/soc.list` (29 asm cases) |
+| `core` / `ahb` | legacy lists, still run through TORV SoC |
+
+Other lists: `deep_hazard.list`, `periph_replay.list`, `periph.list`, `ahb_replay.list`.
+
+First TORV SoC run fetches SoCBUS + PULP UART via `scripts/fetch_ip.sh` if missing (`ip/README.md`).
 
 Regression tree:
 
@@ -153,19 +162,19 @@ Regression tree:
 regress/results/YYYYMMDD_HHMMSS/
   summary.rpt
   open_verdi.sh
-  core/<case>/...
-  ahb/<case>/...
+  soc/<case>/...
 ```
 
 Notes:
 
 - Each case has its own directory.
 - `summary.rpt` aggregates status.
-- AHB mode skips `builtin` (core-only).
+- Legacy `builtin` is old Harvard-TB only and is skipped in TORV SoC.
+- Peripheral asm lives under `tests/periph/<ip>/`; `.plusargs` beside the `.S` file is auto-loaded.
 
 ## Performance counters
 
-`tb_rv32im_top` and `tb_rv32im_ahb_top` print `[PERF]` before PASS when the asm case writes `tohost=1`:
+`tb_torv_soc` prints `[PERF]` before PASS when the asm case writes `tohost=1`:
 
 ```text
 [PERF] cycles=<N> instr=<N> ipc=<N>
@@ -239,7 +248,16 @@ Directed deep-hazard cases ship a sibling `tests/core/asm/<case>.plusargs` file 
 | `+stall_ibus_during_mem_write=N` | Hold `ibus_ready` low for N cycles while a store is in MEM |
 | `+max_cycles=N` | Watchdog override (optional in `.plusargs`) |
 
-Manual `simv` plusargs:
+### TORV peripheral plusargs (`tb_torv_soc`)
+
+Used by `tests/periph/apb_uart_sv/*.plusargs` (replay / UART smoke):
+
+| Plusarg | Purpose |
+|---------|---------|
+| `+replay_expect=N` | Expect exactly N THR pushes to PULP UART FIFO (checked on PASS/timeout) |
+| `+stall_ibus_during_mem_write=N` | IBUS back-pressure during MEM store (replay stress) |
+
+### Manual `simv` plusargs
 
 | Plusarg | Meaning |
 |---------|---------|
@@ -306,9 +324,9 @@ regress/results/<run>/open_verdi.sh alu
 
 `open_verdi.sh` picks filelist/top, prefers `<case>.fsdb`, else `<case>.vcd`, and adds `vcs/simv.daidir` when present.
 
-## Implementation layout
+Asm compile + simulator runs live under **`scripts/internal/`** (not a user entry point — use **`scripts/run_case.sh`**).
 
-Asm compile + simulator runs are implemented under **`scripts/internal/`**. That directory is **not** a supported user entry point — always go through **`scripts/run_case.sh`**.
+TORV peripheral RTL: `ip/third_party/socbus` (`AHB_APB_BRIDGE`), `ip/third_party/apb_uart_sv` — instantiated in `rtl/torv_soc_top.sv` (see `ip/README.md`, `scripts/fetch_ip.sh`).
 
 ## Troubleshooting
 

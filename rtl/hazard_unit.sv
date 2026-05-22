@@ -5,10 +5,13 @@
 //          is not cleared before PC can take the target after DBUS/SBUS stall.
 //   Bug2 — front-end stall always freezes ID/EX; IBUS stall holds EX/MEM instead
 //          of bubbling a completed beat (pairs with rv32im_core mem_wb gating).
+//   Replay — rv32im_core masks dbus_valid/sbus_valid after ready while stall_ex_mem
+//            (dbus_completed/sbus_completed); stall_mem is bus-only (no div_busy).
 module hazard_unit (
   input  logic        id_ex_mem_read,
   input  logic [4:0]  id_ex_rd,
   input  logic [31:0] if_id_inst,
+  input  logic        ex_mem_mem_read,
   input  logic        ex_mem_mem_write,
   input  logic        ex_branch_taken,
   input  logic        ibus_valid,
@@ -71,13 +74,13 @@ module hazard_unit (
   logic mem_bus_stall;
 
   assign ibus_stall     = ibus_valid && !ibus_ready;
-  assign dbus_stall = (dbus_valid_stall || dbus_valid) && !dbus_ready;
-  assign sbus_stall = (sbus_valid_stall || sbus_valid) && !sbus_ready;
+  assign dbus_stall = dbus_valid && !dbus_ready;
+  assign sbus_stall = sbus_valid && !sbus_ready;
   assign mem_bus_stall  = dbus_stall || sbus_stall;
 
   logic stall_mem;
   logic stall_front;
-  assign stall_mem  = mem_bus_stall || div_busy;
+  assign stall_mem  = mem_bus_stall;
   assign stall_front = ibus_stall || load_use || div_busy;
 
   logic dbus_done;
@@ -120,8 +123,17 @@ module hazard_unit (
         // If ID/EX is frozen by the front-end stall, keep EX/MEM from
         // re-capturing the same instruction after a completed beat was bubbled.
         stall_ex_mem = (dbus_valid || sbus_valid || stall_id_ex);
+      end else if (ex_mem_mem_read) begin
+        // A completed load must advance into MEM/WB even if IF is still waiting;
+        // otherwise load-use / load-store forwarding loses the returned data.
+      end else if (ibus_stall && ex_mem_mem_write) begin
+        // Store beat is complete and rv32im_core has masked req_valid, so clear
+        // EX/MEM while ID/EX remains frozen. This avoids an infinite completed
+        // store hold during IBUS back-pressure, and the frozen ID/EX instruction
+        // advances exactly once on a later cycle.
+        bubble_ex_mem = 1'b1;
       end else if (ibus_stall) begin
-        // Hold EX/MEM during IBUS back-pressure (avoid bubble_ex_mem re-issue).
+        // Hold non-memory/ALU ops during IBUS back-pressure to avoid re-retire.
         stall_ex_mem = 1'b1;
       end else begin
         bubble_ex_mem = 1'b1;

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unified single-case simulation entry point for core and AHB targets.
+# Unified single-case simulation — TORV SoC (tb_torv_soc + torv_soc_top).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -10,7 +10,7 @@ Usage:
   scripts/run_case.sh [options] <asm-file>
 
 Options:
-  --target core|ahb     Simulation target (default: core)
+  --target soc|core|ahb Simulation target (default: soc). core/ahb are aliases for soc.
   --sim vcs|verilator   HDL simulator (default: verilator). On CentOS 7 use
                         devtoolset (scripts/verilator_build.sh tries it) or set CXX.
   --fsdb                Dump FSDB waveform
@@ -25,13 +25,16 @@ Options:
   -h, --help            Show this help
 
 Output:
-  build/sim/<target>/<case>/ by default, containing ELF/HEX/DUMP, simulator
-  build (verilator/ or vcs/), simulation log, optional FSDB/VCD, and open_verdi.sh
-  when using VCS.
+  build/sim/soc/<case>/ by default, containing ELF/HEX/DUMP,
+  simulator build (verilator/ or vcs/), simulation log (*.sim.log),
+  optional FSDB/VCD, and open_verdi.sh when using VCS.
+
+  Asm may live under tests/core/asm/ or tests/periph/<ip>/; plusargs are picked from
+  the same directory as the .S file, then tests/core/asm/<case>.plusargs.
 EOF
 }
 
-TARGET="${RV32M_TARGET:-core}"
+TARGET="${RV32M_TARGET:-soc}"
 SIMULATOR="${RV32M_SIMULATOR:-verilator}"
 SRC=""
 
@@ -127,17 +130,20 @@ if [[ -z "$SRC" && $# -gt 0 ]]; then
 fi
 SRC="${SRC:-$ROOT/tests/core/asm/smoke.S}"
 
+export RV32M_TARGET="$TARGET"
+export RV32M_SIMULATOR="$SIMULATOR"
+
 case "$TARGET" in
-  core)
-    export RV32M_SIMULATOR="$SIMULATOR"
-    exec "$ROOT/scripts/internal/run_core_sim.sh" "$SRC"
+  core|ahb)
+    echo "NOTE: --target $TARGET is deprecated; using TORV SoC (soc)." >&2
+    TARGET=soc
     ;;
-  ahb)
-    export RV32M_SIMULATOR="$SIMULATOR"
-    exec "$ROOT/scripts/internal/run_ahb_sim.sh" "$SRC"
+  soc)
     ;;
   *)
-    echo "ERROR: --target must be core or ahb, got: $TARGET" >&2
+    echo "ERROR: --target must be soc (or deprecated core/ahb), got: $TARGET" >&2
     exit 2
     ;;
 esac
+export RV32M_TARGET=soc
+exec "$ROOT/scripts/internal/run_soc_sim.sh" "$SRC"

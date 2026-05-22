@@ -6,12 +6,14 @@ Open-source **RV32I + M-extension** five-stage in-order Harvard core (no CSRs/tr
 
 - **ISA:** RV32I subset + RV32M (`MUL*` single-cycle; `DIV`/`REM*` multi-cycle).
 - **Pipeline:** IF / ID / EX / MEM / WB.
-- **Buses:** Harvard `IBUS`, `DBUS`, `SBUS`; optional **AHB-Lite** wrapper (`rv32im_ahb_top`).
+- **SoC:** **TORV** (**T**orino **O**pen **R**ISC-**V**) — `torv_soc_top` integrates CPU, AHB SRAM, SoCBUS `AHB_APB_BRIDGE`, PULP UART.
+- **Buses:** Harvard inside the core; SoC exposes three **AHB-Lite** masters.
 - **Simulation:** **Verilator** (default); **VCS** via `RV32M_SIMULATOR=vcs` or `./scripts/run_case.sh --sim vcs`.
 - **Waves:** VCD from Verilator/VCS; open with **GTKWave** (`scripts/open_gtkwave.sh`, `make gtkwave`). FSDB only with VCS + Verdi PLI.
 - **PC trace:** testbench writes `pc_trace.tsv` (no waveform parsing required).
 - **Performance:** on PASS, logs `[PERF]` lines (cycles, instr, IPC, opcode mix, stalls/flushes, bus counts).
-- **Regression:** same assembly list for core and AHB targets.
+- **Regression:** default case list per target (`regress/cases/core.list` vs `ahb.list`); unified `run_case.sh` / `regress.sh`.
+- **Peripherals (AHB):** third-party SoCBUS `AHB_APB_BRIDGE` + PULP `apb_uart_sv` (`ip/`, `tests/periph/<ip>/`).
 
 ## Quick start (Verilator + GTKWave)
 
@@ -39,7 +41,7 @@ Prerequisites: **Verilator**, **RISC-V GNU toolchain** (`riscv32-unknown-elf-gcc
    ./scripts/regress.sh
    ```
 
-More detail: [sim/SIM_README.md](sim/SIM_README.md), [regress/README.md](regress/README.md), [tests/core/README.md](tests/core/README.md), [spec/RV32IM_Current_Implementation.md](spec/RV32IM_Current_Implementation.md).
+More detail: [sim/SIM_README.md](sim/SIM_README.md), [regress/README.md](regress/README.md), [tests/core/README.md](tests/core/README.md), [tests/periph/README.md](tests/periph/README.md), [ip/README.md](ip/README.md), [spec/RV32IM_Current_Implementation.md](spec/RV32IM_Current_Implementation.md).
 
 ## Environment
 
@@ -120,8 +122,7 @@ From `sim/Makefile`: `make run CASE=smoke SIM=verilator` or `make run CASE=smoke
 
 | Target | Top module | Single case | Regression |
 |--------|------------|-------------|------------|
-| **core** (default) | `rv32im_core` / `tb_rv32im_top` | `./scripts/run_case.sh tests/core/asm/smoke.S` | `./scripts/regress.sh` |
-| **ahb** | `rv32im_ahb_top` / `tb_rv32im_ahb_top` | `./scripts/run_case.sh --target ahb tests/core/asm/sbus.S` | `./scripts/regress.sh --target ahb` |
+| **soc** (default) | `torv_soc_top` / `tb_torv_soc` | `./scripts/run_case.sh tests/core/asm/smoke.S` | `./scripts/regress.sh` |
 
 Session default: `export RV32M_TARGET=ahb` (used by `run_case.sh` when `--target` is omitted).
 
@@ -232,33 +233,41 @@ make run CASE=smoke VCD=1
 make gtkwave CASE=smoke
 make regress
 make regress REGRESS_CASE=alu          # one case (passes --case alu)
-make regress TARGET=ahb                # AHB full list
+make regress                           # TORV SoC full list
 make list
 make env
 ```
 
-Useful variables: `TARGET=core|ahb`, `CASE=<asm stem>`, `ASM=<path.S>`, `SIM=verilator|vcs`, `FSDB=1`, `VCD=1`, `TRACE=1`, `PC_TRACE=1`, `MAX_CYCLES=N`, `BUILD_DIR=...`, `REGRESS_CASE=<name>`.
+Useful variables: `TARGET=soc` (default), `CASE=<asm stem>`, `ASM=<path.S>`, `SIM=verilator|vcs`, `FSDB=1`, `VCD=1`, `TRACE=1`, `PC_TRACE=1`, `MAX_CYCLES=N`, `BUILD_DIR=...`, `REGRESS_CASE=<name>`.
 
 `tests/core/asm/Makefile` is a tiny forwarder for **core** cases only; prefer `./scripts/run_case.sh` from the repo root.
 
 ## Regression
 
 ```bash
-./scripts/regress.sh                    # core, full list
-./scripts/regress.sh --target ahb       # AHB (skips core-only builtin)
+./scripts/regress.sh                    # TORV SoC, full list
 ./scripts/regress.sh --case alu
 ./scripts/regress.sh --waves            # VCD per case
 ./scripts/regress.sh --pc-trace
 ```
 
-Case list: `regress/cases/core.list` (**26** cases: builtin + 21 asm + 4 perf).
+Case lists (default = `regress/cases/<target>.list`):
 
-Bus-overlap hazard cases (need sibling `tests/core/asm/<case>.plusargs` for TB stall injection):
+| Target | List | Size |
+|--------|------|------|
+| **soc** (default) | `regress/cases/soc.list` | **29** asm (core + `tests/periph/apb_uart_sv/*`) |
+
+`--target core|ahb` still selects older list files but runs the same TORV SoC simulation.
+
+Bus-overlap / replay hazard cases (sibling `tests/core/asm/<case>.plusargs`):
 
 - `hazard_branch_mem_stall` — branch in EX while SBUS store stalls MEM
 - `hazard_ibus_store_dup` — IBUS not-ready during store in MEM
+- `hazard_sbus_replay_smoke` — IBUS stall during one SBUS store; non-idempotent peripheral model
 
-Focused list: `regress/cases/deep_hazard.list`.
+Focused lists: `regress/cases/deep_hazard.list`, `regress/cases/periph_replay.list`.
+
+Third-party IP for TORV SoC: `./scripts/fetch_ip.sh` (auto on first SoC sim). See [ip/README.md](ip/README.md), [tests/periph/README.md](tests/periph/README.md).
 
 Performance micro-benchmarks (also in the default list): `perf_alu_chain`, `perf_branch_loop`, `perf_loadstore_loop`, `perf_mul_loop`.
 
@@ -273,7 +282,7 @@ Assembly tests signal PASS/FAIL by writing **`0xF000_0000`**:
 
 ## Outputs
 
-Single case under `build/sim/<target>/<case>/`: ELF, HEX, disassembly, log, optional VCD/FSDB, `pc_trace.tsv`, Verilator `obj_dir/` or VCS `simv`, helper `open_verdi.sh` when applicable.
+Single case under `build/sim/soc/<case>/`: ELF, HEX, disassembly, log, optional VCD/FSDB, `pc_trace.tsv`, Verilator `obj_dir/` or VCS `simv`, helper `open_verdi.sh` when applicable.
 
 Regression under `regress/results/<timestamp>/`: `summary.rpt`, per-case trees mirroring the layout above.
 
@@ -282,11 +291,11 @@ Regression under `regress/results/<timestamp>/`: `summary.rpt`, per-case trees m
 From a case directory that already ran with VCS/FSDB or VCD:
 
 ```bash
-cd build/sim/core/smoke
+cd build/sim/soc/smoke
 ./open_verdi.sh
 ```
 
-Filelists: use `$RV32M_FILELIST_CORE` / `$RV32M_FILELIST_AHB` with tops `tb_rv32im_top` / `tb_rv32im_ahb_top`.
+Filelist: use `$RV32M_FILELIST_SOC` with top `tb_torv_soc`.
 
 ## Optional: Design Compiler
 
