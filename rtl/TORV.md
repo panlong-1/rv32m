@@ -24,7 +24,7 @@ source scripts/open_rv.sh
 - Build dir: `build/sim/soc/<case>/`
 - Case list: `regress/cases/soc.list`
 
-Legacy `--target core|ahb` and `tb_rv32im_top` / `tb_rv32im_ahb_top` are deprecated.
+Legacy `--target core|ahb` only selects an older case list; simulation always uses `tb_torv_soc`.
 
 ## Memory map (SBUS)
 

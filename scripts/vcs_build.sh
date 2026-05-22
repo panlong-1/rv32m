@@ -31,6 +31,12 @@ while IFS= read -r file; do
   [[ -z "$file" || "$file" =~ ^[[:space:]]*# ]] && continue
   RTL_FILES+=("$(rv32m_resolve_filelist_path "$file")")
 done < "$ROOT/rtl/filelist.f"
+if [[ -f "$ROOT/ip/filelist.f" ]]; then
+  while IFS= read -r file; do
+    [[ -z "$file" || "$file" =~ ^[[:space:]]*# ]] && continue
+    RTL_FILES+=("$(rv32m_resolve_filelist_path "$file")")
+  done < "$ROOT/ip/filelist.f"
+fi
 
 if ! rv32m_verdi_pli_detect; then
   :
@@ -52,10 +58,11 @@ CMD=(
   "$VCS" -full64 -sverilog
   -timescale=1ns/1ps
   +incdir+"$ROOT/rtl"
+  +incdir+"$ROOT/ip/third_party/socbus/include"
 )
 ((${#RV32M_FSDB_DEFINE[@]} > 0)) && CMD+=("${RV32M_FSDB_DEFINE[@]}")
 CMD+=("${RTL_FILES[@]}")
-CMD+=("$ROOT/sim/tb_rv32im_top.sv" -top tb_rv32im_top)
+CMD+=("$ROOT/sim/tb_torv_soc.sv" -top tb_torv_soc)
 ((${#RV32M_VCS_PLI[@]} > 0)) && CMD+=("${RV32M_VCS_PLI[@]}")
 ((${#KDB_FLAGS[@]} > 0)) && CMD+=("${KDB_FLAGS[@]}")
 CMD+=(-Mdir=csrc -o "$OUT_NAME" -l "$VCS_BUILD_DIR/compile.log")

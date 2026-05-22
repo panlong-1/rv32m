@@ -169,7 +169,7 @@ Notes:
 
 - Each case has its own directory.
 - `summary.rpt` aggregates status.
-- Legacy `builtin` is old Harvard-TB only and is skipped in TORV SoC.
+- Legacy `builtin` case type was removed; use `soc.list` asm tests only.
 - Peripheral asm lives under `tests/periph/<ip>/`; `.plusargs` beside the `.S` file is auto-loaded.
 
 ## Performance counters

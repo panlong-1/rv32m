@@ -21,7 +21,7 @@ Default case lists (no `--case-list` needed):
 | `core` (legacy list) | `regress/cases/core.list` |
 | `ahb` (legacy list) | `regress/cases/ahb.list` |
 
-TORV full regression is `soc.list` (29 asm cases). Legacy `builtin` is skipped outside the old Harvard TB.
+TORV full regression is `soc.list` (31 asm cases). Legacy `builtin` in old lists is skipped/removed.
 
 Optional subsets:
 
@@ -58,7 +58,7 @@ make regress PC_TRACE=1 FSDB=1
 
 | File | Target | Contents |
 |------|--------|----------|
-| `regress/cases/core.list` | core | builtin + 22 asm + 4 perf (**27**) |
+| `regress/cases/core.list` | core | 24 asm + 4 perf (legacy list alias) |
 | `regress/cases/ahb.list` | ahb | smoke, sbus + `tests/periph/apb_uart_sv/*` |
 | `regress/cases/deep_hazard.list` | core | `hazard_branch_mem_stall`, `hazard_ibus_store_dup`, `hazard_sbus_replay_smoke` |
 | `regress/cases/periph_replay.list` | ahb | `uart_smoke`, `replay_ibus_store`, `replay_div_store` |
@@ -73,8 +73,7 @@ name type source max_cycles
 
 Types:
 
-- `builtin` — self-check inside the core testbench.
-- `asm` — compile the given `.S` (core: `tests/core/asm/`; AHB periph: `tests/periph/<ip>/`) and load with `+imem=<hex>`.
+- `asm` — compile the given `.S` (core: `tests/core/asm/`; periph: `tests/periph/<ip>/`) and load with `+imem=<hex>`.
 
 `max_cycles` is a watchdog only. Pass/fail uses write to **`0xF000_0000`**: `1` = pass, non-1 = fail.
 

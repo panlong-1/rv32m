@@ -54,7 +54,7 @@ module tb_torv_soc;
     void'($value$plusargs("stall_sbus_writes=%d", stall_sbus_len));
   end
 
-  // Bus stall injection — same semantics as sim/tb_rv32im_top.sv (Harvard TB).
+  // Directed bus stall injection for deep-hazard / replay regress cases.
   always_ff @(posedge hclk or negedge hresetn) begin
     if (!hresetn) begin
       sbus_stall_cnt  <= 8'd0;
