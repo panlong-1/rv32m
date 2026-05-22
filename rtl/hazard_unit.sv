@@ -3,10 +3,8 @@
 // Bus-interaction fixes (2026-05):
 //   Bug1 — flush is suppressed while stall_mem is active so a taken branch in EX
 //          is not cleared before PC can take the target after DBUS/SBUS stall.
-//   Bug2 — front-end stall always freezes ID/EX; IBUS stall holds EX/MEM instead
-//          of bubbling a completed beat (pairs with rv32im_core mem_wb gating).
-//   Replay — rv32im_core masks dbus_valid/sbus_valid after ready while stall_ex_mem
-//            (dbus_completed/sbus_completed); stall_mem is bus-only (no div_busy).
+//   Bug2 / BYG-006 — stall_front (IBUS/div_busy); explicit stall_ex_mem; completed
+//          load retires MEM/WB; completed store bubbles EX/MEM (BYG-003).
 module hazard_unit (
   input  logic        id_ex_mem_read,
   input  logic [4:0]  id_ex_rd,
@@ -79,18 +77,18 @@ module hazard_unit (
   assign mem_bus_stall  = dbus_stall || sbus_stall;
 
   logic stall_mem;
-  logic stall_front;
   assign stall_mem  = mem_bus_stall;
-  assign stall_front = ibus_stall || load_use || div_busy;
 
   logic dbus_done;
   logic sbus_done;
   assign dbus_done = dbus_ready && (dbus_valid || dbus_valid_stall);
   assign sbus_done = sbus_ready && (sbus_valid || sbus_valid_stall);
 
+  // load_use has its own branch; this is IBUS / div_busy only (see elsif order).
+  logic stall_front;
+  assign stall_front = ibus_stall || div_busy;
+
   always_comb begin
-    // Do not flush while MEM is stalled: PC is frozen and clearing ID/EX would
-    // drop the branch before the target is captured (Bug1: branch+mem stall).
     flush       = ex_branch_taken && !stall_mem;
     stall_pc    = 1'b0;
     stall_if_id = 1'b0;
@@ -99,10 +97,6 @@ module hazard_unit (
     bubble_ex_mem = 1'b0;
     bubble_id_ex = 1'b0;
 
-    // Memory must stall the entire pipeline (including on a flush cycle) until
-    // the pending DBUS/SBUS beat completes. If flush is checked first, a taken
-    // branch could suppress stall_mem and corrupt EX/MEM while the bridge is
-    // still busy — seen as an infinite SBUS retry on early SBUS stores.
     if (stall_mem) begin
       stall_pc     = 1'b1;
       stall_if_id  = 1'b1;
@@ -116,27 +110,21 @@ module hazard_unit (
     end else if (stall_front) begin
       stall_pc     = 1'b1;
       stall_if_id  = 1'b1;
-      // Always stall ID/EX on front-end stall (removed IBUS+store hack that let
-      // ID/EX advance while IF/ID was frozen and duplicated the ID instruction).
       stall_id_ex  = 1'b1;
       if (!dbus_done && !sbus_done) begin
-        // If ID/EX is frozen by the front-end stall, keep EX/MEM from
-        // re-capturing the same instruction after a completed beat was bubbled.
         stall_ex_mem = (dbus_valid || sbus_valid || stall_id_ex);
       end else if (ex_mem_mem_read) begin
-        // BYG-006: stall_ex_mem stays 0 here — see docs/bugs/byg_torv_soc_debug.md.
-        // Do not advance EX/MEM while stall_id_ex without an explicit stall_ex_mem=1.
+        // Completed load: retire into MEM/WB while ID/EX stays frozen.
+        stall_ex_mem = 1'b0;
       end else if (ibus_stall && ex_mem_mem_write) begin
-        // Store beat is complete and rv32im_core has masked req_valid, so clear
-        // EX/MEM while ID/EX remains frozen. This avoids an infinite completed
-        // store hold during IBUS back-pressure, and the frozen ID/EX instruction
-        // advances exactly once on a later cycle.
+        // Completed store: bubble EX/MEM (needs stall_ex_mem=0 to latch bubble).
         bubble_ex_mem = 1'b1;
+        stall_ex_mem  = 1'b0;
       end else if (ibus_stall) begin
-        // Hold non-memory/ALU ops during IBUS back-pressure to avoid re-retire.
         stall_ex_mem = 1'b1;
       end else begin
         bubble_ex_mem = 1'b1;
+        stall_ex_mem  = 1'b0;
       end
     end
   end

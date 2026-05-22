@@ -132,69 +132,44 @@ Evidence:
 
 - `hazard_sbus_rx_replay_smoke`: PASS (`uart_rbr_read_count == 1`, `+replay_expect_rbr=1`)
 
-### BYG-006: Instruction duplication during `stall_front` (documented)
+### BYG-006: Instruction duplication during `stall_front` (fixed)
 
-Symptom (review / microarch):
+Symptom:
 
-- With `stall_id_ex = 1` and the old empty `ex_mem_mem_read` branch leaving `stall_ex_mem = 0`, a completed load could let `EX/MEM` re-latch the frozen `ID/EX` instruction on the next edge (duplicate `addi`).
+- With `stall_id_ex = 1` and an empty `else if (ex_mem_mem_read)` branch, `stall_ex_mem` stayed at the combinational default `0`. `EX/MEM` re-captured the frozen `ID/EX` instruction (duplicate `addi`).
 
 Cause:
 
-- `hazard_unit` `stall_front` allowed `EX/MEM` to advance while `ID/EX` stayed frozen.
+- SystemVerilog `always_comb` defaults assign `stall_ex_mem = 0`; a comment-only branch does not hold the stage.
 
-Mitigation in tree today:
+Fix:
 
-- Completed **stores** during `ibus_stall` use `bubble_ex_mem` (BYG-003 path).
-- Directed `hazard_ibus_insn_dup` passes with current store-then-`addi` scheduling.
-- Holding all completed loads (`ex_mem_mem_read && dbus_done`) fixes the theory but regresses `hazard.S` (DBus load-use) in this SoC integration — left as review item.
+- `stall_front` defaults to freezing PC/IF/ID/EX/MEM when the IBUS or divider is busy.
+- **Completed load** (`ex_mem_mem_read && dbus_done/sbus_done`): `stall_ex_mem = 0` so `MEM/WB` can retire while `ID/EX` stays frozen.
+- **Completed store** during `ibus_stall`: `bubble_ex_mem` with `stall_ex_mem = 0` so the bubble clears `EX/MEM` (BYG-003).
+- Pending beat (`!dbus_done && !sbus_done`): `stall_ex_mem = (dbus_valid || sbus_valid || stall_id_ex)`.
+- `rv32im_core`: clear `dbus_completed` / `sbus_completed` only after `EX/MEM` has no matching mem op.
 
 Evidence:
 
-- `hazard_ibus_insn_dup`: PASS (regression guard)
-- `hazard`: PASS (legacy list)
+- `hazard_ibus_insn_dup`: PASS
+- `hazard_ibus_store_dup`: PASS
+- `hazard_sbus_rx_replay_smoke`: PASS (`uart_rbr_read_count == 1`)
+- Full `./scripts/regress.sh`: 31/31 PASS (`soc.list`)
 
 ## Regression Evidence
-
-Final run (this workspace):
-
-```text
-regress/results/20260523_031941/summary.rpt
-PASS 29
-```
-
-Earlier failing run (before fixes, for comparison):
-
-```text
-regress/results/20260523_023105/summary.rpt
-```
-
-Notable deltas after fixes:
-
-- `hazard`, `hazard_branch_mem_stall`, `hazard_ibus_store_dup`, `bus_mix_dbus_sbus` — PASS
-- `hazard_sbus_replay_smoke` — PASS (uses `+replay_expect=1`, UART @ `0x4000_1000`)
-- `uart_smoke`, `replay_*` — PASS
-
-If you still see failures locally, ensure you have the latest tree (especially `hazard_sbus_replay_smoke.S`, `rtl/hazard_unit.sv`, `rtl/rv32im_core.sv`) and run:
 
 ```bash
 ./scripts/regress.sh
 ```
 
-```text
-hazard_ibus_store_dup PASS
-uart_smoke PASS
-replay_div_store PASS
-hazard PASS
-hazard_branch_mem_stall PASS
-bus_mix_dbus_sbus PASS
-hazard_sbus_replay_smoke PASS
-```
+Latest full TORV regress: **31/31 PASS** (includes `hazard_ibus_insn_dup`, `hazard_ibus_store_dup`, `hazard_sbus_rx_replay_smoke`).
 
 ## Code Locations
 
 - `rtl/torv_soc_top.sv`: TORV address map and UART APB window.
 - `rtl/torv_ahb_sram.sv`: low-16-bit SRAM indexing compatibility with legacy tests.
-- `rtl/hazard_unit.sv`: global `stall_front` freeze (BYG-006).
+- `rtl/hazard_unit.sv`: `stall_front` / BYG-006 insn-dup fix.
 - `rtl/rv32im_core.sv`: load/store replay guard on DBUS/SBUS valid (BYG-005).
 - `rtl/torv_soc_top.sv`: `uart_rbr_read_count` for directed RX replay tests; see file header for AHB `HSEL`/mux caveats vs pipelined masters.
 - `sim/tb_torv_soc.sv`: TORV single testbench, replay expectation, directed bus stalls.
