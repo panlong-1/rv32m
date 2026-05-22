@@ -54,7 +54,7 @@ After sourcing, **`scripts/` is on `PATH`**: you can run `run_case.sh`, `regress
 
 When a case finishes, run **`t`** in the same shell to **`cd` into that case’s build directory** (ELF/HEX/log/VCD, etc.). The path is stored in `$RV32M_LAST_CASE_DIR_FILE` (default `$RV32M_ROOT/.open_rv32m_last_case_build_dir`).
 
-Set paths **before** `source`, or copy `scripts/open_rv.local.sh.example` → `scripts/open_rv.local.sh` (gitignored):
+Edit the **Site defaults** block at the top of `scripts/open_rv.sh` for your machine (RISC-V toolchain, Verilator, Synopsys). No manual `export` is required before `source`. Optional: copy `scripts/open_rv.local.sh.example` → `scripts/open_rv.local.sh` (gitignored) to override without editing the tracked script.
 
 | Variable | Purpose |
 |----------|---------|

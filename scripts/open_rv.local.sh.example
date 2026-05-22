@@ -1,22 +1,12 @@
 #!/usr/bin/env bash
-# Copy to open_rv.local.sh and edit paths for your machine (open_rv.local.sh is gitignored).
+# Optional overrides — only needed if you do not want to edit scripts/open_rv.sh
+# site defaults, or you must keep secrets out of git.
 #
 #   cp scripts/open_rv.local.sh.example scripts/open_rv.local.sh
 #   source scripts/open_rv.sh
+#
+# This file is sourced *after* open_rv.sh site defaults and overrides them.
 
-# --- RISC-V toolchain ---
-export RV32M_RISCV_TOOLCHAIN_BIN="/home/ic/project/riscv_toolchain/bin"
-export RV32M_RISCV_GNU_PREFIX="riscv64-unknown-elf-"
-
-# --- Verilator / GTKWave (open-source sim & waves) ---
-export RV32M_VERILATOR="verilator"
-export RV32M_VERILATOR_BIN_DIR="/usr/local/bin"
-export RV32M_GTKWAVE="gtkwave"
-
-# --- Synopsys (optional; comment out if not installed) ---
-export RV32M_VCS_HOME="/opt/synopsys/vcs/Q-2020.03-SP2-7"
-export RV32M_VERDI_HOME="/opt/synopsys/verdi/R-2020.12-SP1"
-export RV32M_DC_HOME="/opt/synopsys/syn/R-2020.09-SP4"
+# export RV32M_RISCV_TOOLCHAIN_BIN="/other/path/riscv/bin"
+# export RV32M_RISCV_GNU_PREFIX="riscv32-unknown-elf-"
 # export RV32M_SNPSLMD_LICENSE_FILE="27000@your-license-server"
-
-# export TSMC013_TARGET_LIB="$HOME/PDK/TSMC_013/synopsys/slow.db"
