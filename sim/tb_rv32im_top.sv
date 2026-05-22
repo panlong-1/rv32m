@@ -94,9 +94,64 @@ module tb_rv32im_top;
                   smem[{sbus_addr[11:2], 2'b00}]};
   end
 
-  assign ibus_ready = 1'b1;
+  // Optional bus back-pressure for directed hazard tests (see tests/core/asm/*.plusargs).
+  // +stall_sbus_writes=N      — stretch first SBUS store (hazard_branch_mem_stall)
+  // +stall_ibus_during_mem_write=N — IBUS wait during store in MEM (hazard_ibus_store_dup)
+  int stall_sbus_len;
+  int stall_ibus_len;
+  logic [7:0] sbus_stall_cnt;
+  logic [7:0] ibus_stall_cnt;
+  logic       ibus_stall_armed;
+  logic       sbus_stall_done;
+
+  initial begin
+    stall_sbus_len = 0;
+    stall_ibus_len = 0;
+    void'($value$plusargs("stall_sbus_writes=%d", stall_sbus_len));
+    void'($value$plusargs("stall_ibus_during_mem_write=%d", stall_ibus_len));
+  end
+
+  wire sbus_stall_req =
+      (stall_sbus_len > 0) && sbus_valid && sbus_we && (sbus_addr != TOHOST_ADDR);
+  wire mem_store_active =
+      dut.ex_mem_mem_write && (sbus_valid || dbus_valid);
+
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      sbus_stall_cnt   <= 8'd0;
+      ibus_stall_cnt   <= 8'd0;
+      ibus_stall_armed <= 1'b0;
+      sbus_stall_done  <= 1'b0;
+    end else begin
+      if (stall_sbus_len > 0) begin
+        if (!sbus_stall_done && sbus_stall_req) begin
+          sbus_stall_cnt  <= stall_sbus_len[7:0];
+          sbus_stall_done <= 1'b1;
+        end else if (sbus_stall_cnt != 8'd0)
+          sbus_stall_cnt <= sbus_stall_cnt - 8'd1;
+      end
+
+      if (stall_ibus_len > 0) begin
+        if (!ibus_stall_armed && mem_store_active)
+          ibus_stall_armed <= 1'b1;
+        if (ibus_stall_armed) begin
+          if (ibus_stall_cnt == 8'd0)
+            ibus_stall_cnt <= stall_ibus_len[7:0];
+          else
+            ibus_stall_cnt <= ibus_stall_cnt - 8'd1;
+          if (ibus_stall_cnt == 8'd1)
+            ibus_stall_armed <= 1'b0;
+        end
+      end
+    end
+  end
+
+  // Deassert ready on the first beat (not only after the counter register updates).
+  assign ibus_ready = (ibus_stall_cnt == 8'd0) &&
+                      !(stall_ibus_len > 0 && ibus_stall_armed && ibus_stall_cnt == 8'd0);
   assign dbus_ready = 1'b1;
-  assign sbus_ready = 1'b1;
+  assign sbus_ready = (sbus_stall_cnt == 8'd0) &&
+                      !(stall_sbus_len > 0 && sbus_stall_req && !sbus_stall_done);
 
   // Printed just before tohost PASS so the case log is self-contained.
   task automatic print_perf;

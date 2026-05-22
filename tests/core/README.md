@@ -49,6 +49,10 @@ Current directed cases:
 - `muldiv.S`: RV32M multiply/divide corner cases.
 - `muldiv_stall.S`: dependent consumers after multi-cycle DIV/REM.
 - `hazard.S`: load-use, load-branch, and load-store hazard scenarios.
+- `hazard_branch_mem_stall.S`: taken branch in EX while an SBUS store stalls MEM (needs `hazard_branch_mem_stall.plusargs`; targets flush vs `stall_mem` in `hazard_unit.sv`).
+- `hazard_ibus_store_dup.S`: IBUS stall with store in MEM (needs `hazard_ibus_store_dup.plusargs`; targets `stall_id_ex` hack when `ex_mem_mem_write && ibus_stall`).
+
+These two cases use testbench bus back-pressure (`+stall_sbus_writes` / `+stall_ibus_during_mem_write` in `sim/tb_rv32im_top.sv`). They are listed in `regress/cases/core.list` and also in `regress/cases/deep_hazard.list` for focused runs.
 
 ## Running tests
 

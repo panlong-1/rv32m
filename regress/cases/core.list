@@ -19,6 +19,8 @@ sbus         asm      tests/core/asm/sbus.S        12000
 bus_mix_dbus_sbus asm tests/core/asm/bus_mix_dbus_sbus.S 15000
 bus_sbus_widths   asm tests/core/asm/bus_sbus_widths.S   12000
 bus_ibus_dbus_fill asm tests/core/asm/bus_ibus_dbus_fill.S 10000
+hazard_branch_mem_stall asm tests/core/asm/hazard_branch_mem_stall.S 20000
+hazard_ibus_store_dup asm tests/core/asm/hazard_ibus_store_dup.S 20000
 perf_alu_chain asm tests/core/asm/perf_alu_chain.S 20000
 perf_branch_loop asm tests/core/asm/perf_branch_loop.S 20000
 perf_loadstore_loop asm tests/core/asm/perf_loadstore_loop.S 20000

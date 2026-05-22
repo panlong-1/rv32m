@@ -229,6 +229,16 @@ The testbench writes TSV directly (no VCD/FSDB parsing required) for offline cor
 ./scripts/regress.sh --case smoke --pc-trace
 ```
 
+### Bus stall plusargs (core TB only)
+
+Directed deep-hazard cases ship a sibling `tests/core/asm/<case>.plusargs` file (loaded automatically by `run_case.sh`):
+
+| Plusarg | Purpose |
+|---------|---------|
+| `+stall_sbus_writes=N` | Hold `sbus_ready` low for N cycles on the first SBUS store |
+| `+stall_ibus_during_mem_write=N` | Hold `ibus_ready` low for N cycles while a store is in MEM |
+| `+max_cycles=N` | Watchdog override (optional in `.plusargs`) |
+
 Manual `simv` plusargs:
 
 | Plusarg | Meaning |

@@ -1,0 +1,3 @@
+# IBUS not-ready while a store is in MEM (DBUS/SBUS ready)
++stall_ibus_during_mem_write=12
++max_cycles=25000
