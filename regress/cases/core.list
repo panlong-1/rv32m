@@ -1,3 +1,4 @@
+# Legacy list (core-era cases, no UART/periph replay). Canonical TORV list: regress/cases/soc.list
 # name       type     source              max_cycles
 # builtin removed — TORV SoC uses asm tests only (see soc.list)
 smoke        asm      tests/core/asm/smoke.S       5000

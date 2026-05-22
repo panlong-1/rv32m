@@ -1,0 +1,3 @@
+# TB arms IBUS stall on mem_bus_active (read OR write); plusarg name is historical.
++stall_ibus_during_mem_write=16
++max_cycles=25000

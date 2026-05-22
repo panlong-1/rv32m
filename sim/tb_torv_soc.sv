@@ -369,7 +369,7 @@ module tb_torv_soc;
         if ($test$plusargs("pc_trace_each_cycle"))
           pc_trace_each = 1'b1;
         $fwrite(pc_trace_fd,
-                "time_ps\tpc_hex\tibus_inst_hex\tif_id_pc_hex\tif_id_inst_hex\n");
+                "time_ps\tpc_hex\tibus_inst_hex\tif_id_pc_hex\tif_id_inst_hex\twb_we\twb_rd\twb_wdata_hex\n");
       end
     end
   end
@@ -389,8 +389,10 @@ module tb_torv_soc;
         log_it = pc_trace_each || !pc_trace_warmed ||
             (dut.u_cpu.u_core.pc !== pc_trace_prev);
         if (log_it) begin
-          $fwrite(pc_trace_fd, "%0t\t%h\t%h\t%h\t%h\n", $time, dut.u_cpu.u_core.pc,
-                  dut.i_hrdata, dut.u_cpu.u_core.if_id_pc, dut.u_cpu.u_core.if_id_inst);
+          $fwrite(pc_trace_fd, "%0t\t%h\t%h\t%h\t%h\t%b\t%h\t%h\n", $time, dut.u_cpu.u_core.pc,
+                  dut.i_hrdata, dut.u_cpu.u_core.if_id_pc, dut.u_cpu.u_core.if_id_inst,
+                  dut.u_cpu.u_core.mem_wb_reg_write, dut.u_cpu.u_core.mem_wb_rd,
+                  dut.u_cpu.u_core.wb_wdata);
           pc_trace_warmed <= 1'b1;
         end
       end

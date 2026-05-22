@@ -154,8 +154,9 @@ Evidence:
 
 - `hazard_ibus_insn_dup`: PASS
 - `hazard_ibus_store_dup`: PASS
+- `hazard_ibus_load_dup`: PASS (directed load + frozen `addi`; guard for load-path dup)
 - `hazard_sbus_rx_replay_smoke`: PASS (`uart_rbr_read_count == 1`)
-- Full `./scripts/regress.sh`: 31/31 PASS (`soc.list`)
+- Full `./scripts/regress.sh`: 32/32 PASS (`soc.list`)
 
 ## Regression Evidence
 
@@ -163,7 +164,9 @@ Evidence:
 ./scripts/regress.sh
 ```
 
-Latest full TORV regress: **31/31 PASS** (includes `hazard_ibus_insn_dup`, `hazard_ibus_store_dup`, `hazard_sbus_rx_replay_smoke`).
+Latest full TORV regress: **32/32 PASS** (`soc.list`, includes `hazard_ibus_load_dup`).
+
+Trace-based dup check (no waves): `./scripts/check_hazard_dup_trace.py --case <name> --run`.
 
 ## Code Locations
 

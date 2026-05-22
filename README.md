@@ -10,9 +10,10 @@ Open-source **RV32I + M-extension** five-stage in-order Harvard core (no CSRs/tr
 - **Buses:** Harvard inside the core; SoC exposes three **AHB-Lite** masters.
 - **Simulation:** **Verilator** (default); **VCS** via `RV32M_SIMULATOR=vcs` or `./scripts/run_case.sh --sim vcs`.
 - **Waves:** VCD from Verilator/VCS; open with **GTKWave** (`scripts/open_gtkwave.sh`, `make gtkwave`). FSDB only with VCS + Verdi PLI.
-- **PC trace:** testbench writes `pc_trace.tsv` (no waveform parsing required).
-- **Performance:** on PASS, logs `[PERF]` lines (cycles, instr, IPC, opcode mix, stalls/flushes, bus counts).
-- **Regression:** default case list per target (`regress/cases/core.list` vs `ahb.list`); unified `run_case.sh` / `regress.sh`.
+- **PC trace:** `pc_trace.tsv` with optional WB columns for directed checks (`scripts/check_hazard_dup_trace.py`).
+- **Performance:** on PASS, logs `[PERF]` lines; after regress, `perf_summary.csv` via `scripts/perf_summary.py`.
+- **Regression:** canonical **`regress/cases/soc.list`** (TORV SoC); `deep_hazard.list` is a fast hazard subset.
+- **SoC map:** [docs/torv_address_map.md](docs/torv_address_map.md) (DMEM / SBUS SRAM / UART / tohost).
 - **Peripherals (AHB):** third-party SoCBUS `AHB_APB_BRIDGE` + PULP `apb_uart_sv` (`ip/`, `tests/periph/<ip>/`).
 
 ## Quick start (Verilator + GTKWave)
@@ -211,9 +212,10 @@ source scripts/open_rv.sh
 Default build layout:
 
 ```text
-build/sim/core/<case>/
-build/sim/ahb/<case>/
+build/sim/soc/<case>/
 ```
+
+(`--target core|ahb` are aliases for the same SoC path.)
 
 To keep an existing build directory instead of wiping it:
 
@@ -245,27 +247,41 @@ Useful variables: `TARGET=soc` (default), `CASE=<asm stem>`, `ASM=<path.S>`, `SI
 ## Regression
 
 ```bash
-./scripts/regress.sh                    # TORV SoC, full list
+./scripts/regress.sh                         # TORV SoC, regress/cases/soc.list (32 cases)
 ./scripts/regress.sh --case alu
-./scripts/regress.sh --waves            # VCD per case
-./scripts/regress.sh --pc-trace
+./scripts/regress.sh --case-list regress/cases/deep_hazard.list   # hazard subset (6 cases)
+./scripts/regress.sh --waves                 # VCD per case
+./scripts/regress.sh --pc-trace              # pc_trace.tsv per case (includes WB columns)
+
+# After a regress run (or on latest regress/results/<stamp>/):
+./scripts/perf_summary.py
+./scripts/perf_summary.py regress/results/<stamp> --csv perf.csv
 ```
 
-Case lists (default = `regress/cases/<target>.list`):
+Case lists:
 
-| Target | List | Size |
-|--------|------|------|
-| **soc** (default) | `regress/cases/soc.list` | **29** asm (core + `tests/periph/apb_uart_sv/*`) |
+| List | Role |
+|------|------|
+| **`regress/cases/soc.list`** | **Canonical** full TORV regress (core asm + periph replay) |
+| `regress/cases/deep_hazard.list` | Directed hazard/replay subset (all entries ⊂ `soc.list`) |
+| `regress/cases/core.list` | Legacy (no periph); prefer `soc.list` |
 
-`--target core|ahb` still selects older list files but runs the same TORV SoC simulation.
+`--target core|ahb` selects legacy list files but runs the same TORV SoC simulator.
 
-Bus-overlap / replay hazard cases (sibling `tests/core/asm/<case>.plusargs`):
+Directed hazard checks (`tests/core/asm/<case>.plusargs`):
 
 - `hazard_branch_mem_stall` — branch in EX while SBUS store stalls MEM
-- `hazard_ibus_store_dup` — IBUS not-ready during store in MEM
-- `hazard_sbus_replay_smoke` — IBUS stall during one SBUS store; non-idempotent peripheral model
-- `hazard_ibus_insn_dup` — IBUS stall after store; ID/EX must not duplicate into EX/MEM (BYG-006 guard)
-- `hazard_sbus_rx_replay_smoke` — IBUS stall during UART RBR read; `+replay_expect_rbr=1` (BYG-005)
+- `hazard_ibus_store_dup` / `hazard_ibus_insn_dup` / `hazard_ibus_load_dup` — IBUS stall during MEM
+- `hazard_sbus_replay_smoke` / `hazard_sbus_rx_replay_smoke` — SBUS replay / UART RBR (`+replay_expect_rbr=1`)
+
+Post-sim trace check (no waveform):
+
+```bash
+./scripts/check_hazard_dup_trace.py --case hazard_ibus_insn_dup --run
+./scripts/check_hazard_dup_trace.py --case hazard_ibus_load_dup --run
+```
+
+Future optimization ideas: [docs/TODO_LIST.md](docs/TODO_LIST.md).
 
 Focused lists: `regress/cases/deep_hazard.list`, `regress/cases/periph_replay.list`.
 
