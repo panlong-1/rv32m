@@ -1,0 +1,6 @@
+# AHB top: core smoke on IMEM + SBUS + PULP UART peripheral tests
+smoke asm tests/core/asm/smoke.S 5000
+sbus asm tests/core/asm/sbus.S 12000
+uart_smoke asm tests/periph/apb_uart_sv/uart_smoke.S 5000
+replay_ibus_store asm tests/periph/apb_uart_sv/replay_ibus_store.S 5000
+replay_div_store asm tests/periph/apb_uart_sv/replay_div_store.S 25000

@@ -1,6 +1,9 @@
 # Simulation/build artifacts
 build/
 regress/results/
+
+# Third-party IP tarballs (scripts/fetch_ip.sh)
+ip/third_party/
 tests/core/asm/work/
 
 # Synopsys/Verdi generated files

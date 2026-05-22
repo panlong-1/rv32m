@@ -1,0 +1,5 @@
+# Alias: same as periph_replay.list (use with unified ./scripts/regress.sh --target ahb --case-list …)
+# Kept as alias for older scripts.
+uart_smoke asm tests/periph/apb_uart_sv/uart_smoke.S 5000
+replay_ibus_store asm tests/periph/apb_uart_sv/replay_ibus_store.S 5000
+replay_div_store asm tests/periph/apb_uart_sv/replay_div_store.S 25000

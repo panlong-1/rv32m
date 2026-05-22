@@ -81,9 +81,13 @@ exec "$helper"
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run open_rv32m regression")
-    parser.add_argument("--target", choices=["core", "ahb", "soc"], default="core")
+    parser.add_argument("--target", choices=["core", "ahb", "soc"], default="soc")
     parser.add_argument("--sim", choices=["vcs", "verilator"], default="verilator")
-    parser.add_argument("--case-list", default="regress/cases/core.list")
+    parser.add_argument(
+        "--case-list",
+        default=None,
+        help="Case list file (default: regress/cases/<target>.list)",
+    )
     parser.add_argument("--case", action="append", dest="case_filter", help="Run only this case name")
     parser.add_argument("--waves", action="store_true", help="Pass +vcd to simv")
     parser.add_argument(
@@ -114,16 +118,24 @@ def main() -> int:
     env.setdefault("PREFIX", "riscv64-unknown-elf-")
     env["PATH"] = env["TOOLCHAIN"] + os.pathsep + env.get("PATH", "")
 
-    if args.target == "soc":
-        print("SoC regression target is reserved; use --target core or --target ahb today.")
+    sim_target = args.target
+    if sim_target in ("core", "ahb"):
+        print(f"NOTE: --target {sim_target} is deprecated; running TORV SoC (soc).")
+        sim_target = "soc"
+
+    case_list = args.case_list or f"regress/cases/{args.target}.list"
+    case_list_path = root / case_list
+    if not case_list_path.is_file():
+        print(f"ERROR: case list not found: {case_list_path}", file=sys.stderr)
         return 2
 
     stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     result_dir = root / "regress" / "results" / stamp
-    target_dir = result_dir / args.target
+    target_dir = result_dir / sim_target
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    cases = load_cases(root / args.case_list)
+    print(f"Case list: {case_list}")
+    cases = load_cases(case_list_path)
     if args.case_filter:
         wanted = set(args.case_filter)
         cases = [c for c in cases if c.name in wanted]
@@ -144,8 +156,8 @@ def main() -> int:
         env["RV32M_PC_TRACE_EACH_CYCLE"] = "1"
 
     for case in cases:
-        if args.target == "ahb" and case.kind == "builtin":
-            summary.append((case.name, "SKIP", "builtin is core-only"))
+        if sim_target == "soc" and case.kind == "builtin":
+            summary.append((case.name, "SKIP", "builtin is legacy Harvard TB only"))
             continue
 
         print(f"\n=== CASE {case.name} ({case.kind}) ===")
@@ -213,7 +225,7 @@ def main() -> int:
             cmd = [
                 str(root / "scripts/run_case.sh"),
                 "--target",
-                args.target,
+                sim_target,
                 "--sim",
                 args.sim,
                 str(root / case.source),

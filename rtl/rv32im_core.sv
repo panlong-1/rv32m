@@ -406,6 +406,8 @@ module rv32im_core (
   logic sbus_valid_w;
   logic dbus_valid_r;
   logic sbus_valid_r;
+  logic dbus_completed;
+  logic sbus_completed;
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -416,6 +418,28 @@ module rv32im_core (
       sbus_valid_r <= sbus_valid_w;
     end
   end
+
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      dbus_completed <= 1'b0;
+      sbus_completed <= 1'b0;
+    end else if (!stall_ex_mem) begin
+      dbus_completed <= 1'b0;
+      sbus_completed <= 1'b0;
+    end else begin
+      // Replay guard applies to stores only (AHB re-issuing a write while EX/MEM is held).
+      if (dbus_valid_w && dbus_ready && ex_mem_mem_write)
+        dbus_completed <= 1'b1;
+      if (sbus_valid_w && sbus_ready && ex_mem_mem_write)
+        sbus_completed <= 1'b1;
+    end
+  end
+
+  // Keep req_valid asserted until the bridge returns req_ready. Once a store has
+  // completed while EX/MEM is held, drop valid so AHB/APB side effects (UART THR)
+  // are not replayed on the next bridge IDLE cycle.
+  assign dbus_valid = dbus_valid_w && !dbus_completed;
+  assign sbus_valid = sbus_valid_w && !sbus_completed;
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -477,13 +501,11 @@ module rv32im_core (
     .sbus_wdata(sbus_wdata)
   );
 
-  assign dbus_valid = dbus_valid_w;
-  assign sbus_valid = sbus_valid_w;
-
   hazard_unit u_hz (
     .id_ex_mem_read(id_ex_mem_read),
     .id_ex_rd(id_ex_rd),
     .if_id_inst(if_id_inst),
+    .ex_mem_mem_read(ex_mem_mem_read),
     .ex_mem_mem_write(ex_mem_mem_write),
     .ex_branch_taken(ex_branch_taken),
     .ibus_valid(ibus_valid),

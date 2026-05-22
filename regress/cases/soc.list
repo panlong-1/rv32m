@@ -1,5 +1,5 @@
-# name       type     source              max_cycles
-builtin      builtin  -                   0
+# TORV SoC unified regression (tb_torv_soc + torv_soc_top)
+# Core asm + peripheral replay cases; no Harvard-only builtin.
 smoke        asm      tests/core/asm/smoke.S       5000
 alu          asm      tests/core/asm/alu.S         5000
 imm          asm      tests/core/asm/imm.S         5000
@@ -26,3 +26,6 @@ perf_alu_chain asm tests/core/asm/perf_alu_chain.S 20000
 perf_branch_loop asm tests/core/asm/perf_branch_loop.S 20000
 perf_loadstore_loop asm tests/core/asm/perf_loadstore_loop.S 20000
 perf_mul_loop asm tests/core/asm/perf_mul_loop.S 30000
+uart_smoke asm tests/periph/apb_uart_sv/uart_smoke.S 5000
+replay_ibus_store asm tests/periph/apb_uart_sv/replay_ibus_store.S 5000
+replay_div_store asm tests/periph/apb_uart_sv/replay_div_store.S 25000

@@ -253,15 +253,21 @@ Misaligned access exceptions are not implemented. The current logic selects byte
 - branch/jump flush (`flush = ex_branch_taken && !stall_mem`)
 - `div_busy` from multi-cycle divide in EX
 
+`stall_mem` is **only** `mem_bus_stall` (DBUS/SBUS wait). `div_busy` stalls the front end via `stall_front`, not MEM — so MEM/WB can drain while divide runs in EX.
+
+`rv32im_core` masks `dbus_valid` / `sbus_valid` after a completed handshake while `stall_ex_mem` is active (`dbus_completed` / `sbus_completed`). This prevents the AHB bridge from re-issuing the same store when EX/MEM is held for IBUS stall or other front-end stalls (AHB memory-replay fix).
+
 Priority in the current combinational hazard logic is:
 
-1. MEM bus stall or `div_busy` (full pipeline hold; **no flush** while active)
+1. MEM bus stall (full pipeline hold; **no flush** while active)
 2. Taken branch/jump flush (only when not in item 1)
 3. ID/EX load-use bubble
-4. Front-end stall (`ibus_stall`, load-use overlap with `div_busy`, etc.)
+4. Front-end stall (`ibus_stall`, `load_use`, `div_busy`, etc.)
    - `stall_id_ex` is always asserted in item 4
    - If the pending DBUS/SBUS beat is not done: hold EX/MEM
-   - Else if `ibus_stall`: hold EX/MEM (do not `bubble_ex_mem`; avoids re-retiring the same EX op after IBUS wait)
+   - Else if completed beat is a load: allow EX/MEM to advance into MEM/WB so load-use consumers can release
+   - Else if completed beat is a store during `ibus_stall`: bubble EX/MEM after `rv32im_core` masks valid to avoid replay
+   - Else if `ibus_stall`: hold EX/MEM
    - Else: bubble EX/MEM for a completed beat while the front end is stalled
 
 `rv32im_core` complements the hazard unit:
@@ -273,8 +279,20 @@ Directed bus-overlap tests (require testbench plusargs in `tests/core/asm/*.plus
 
 - `hazard_branch_mem_stall.S` — taken branch in EX while SBUS store stalls MEM (`+stall_sbus_writes`)
 - `hazard_ibus_store_dup.S` — IBUS stall during store in MEM (`+stall_ibus_during_mem_write`)
+- `hazard_sbus_replay_smoke.S` — IBUS stall during one TORV UART store at `0x4000_1000`; TB checks `+replay_expect=1`
 
 The core also includes a WB-to-ID register read bypass in `rv32im_core`. This models write-first register file behavior for same-cycle writeback/decode dependencies and avoids X propagation when an instruction in ID reads the register being written in WB.
+
+### 9.1 TORV SoC simulation top
+
+`torv_soc_top` wraps `rv32im_ahb_top` (three `rv32im_ahb_bridge` masters) plus `torv_ahb_sram` for IMEM/DBUS/SBUS SRAM and the APB UART peripheral window.
+
+Peripheral window `0x4000_1000`–`0x4000_1FFF` uses third-party IP only (see `ip/README.md`):
+
+- [shalan/SoCBUS](https://github.com/shalan/SoCBUS) `AHB_APB_BRIDGE`
+- [pulp-platform/apb_uart_sv](https://github.com/pulp-platform/apb_uart_sv) on APB
+
+Tests: `tests/periph/<ip>/` (currently `apb_uart_sv/`). Unified entry: `./scripts/run_case.sh …`, `./scripts/regress.sh` (default list `regress/cases/soc.list`).
 
 ## 10. Register File
 
@@ -289,7 +307,7 @@ The physical storage is `mem[31:1]`; there is no reset initialization for x1 thr
 
 ## 11. Verification Status
 
-The current self-checking VCS testbench is `sim/tb_rv32im_top.sv`.
+The current self-checking Verilator/VCS testbench is `sim/tb_torv_soc.sv`.
 
 It provides:
 
@@ -316,15 +334,15 @@ Toolchain-driven assembly tests currently cover:
 - load-use, load-branch, byte/halfword load extension, and load-to-store-data hazards (`tests/core/asm/hazard.S`)
 - branch flush vs MEM bus stall (`tests/core/asm/hazard_branch_mem_stall.S`)
 - IBUS stall vs store / ID/EX freeze (`tests/core/asm/hazard_ibus_store_dup.S`)
+- SBUS replay smoke with non-idempotent peripheral model (`tests/core/asm/hazard_sbus_replay_smoke.S`)
 
-Core Verilator regression (`regress/cases/core.list`): **26** cases (builtin + 21 asm + 4 perf).
+TORV SoC Verilator regression (`regress/cases/soc.list`): **29** asm cases (core directed/perf plus `tests/periph/apb_uart_sv/*`).
 
 Current observed result:
 
 ```text
-[PASS] test1 ADDI chain: x1=5 x2=8
-[PASS] test2 MUL: x5=12
-All tb_rv32im_top checks passed.
+regress/results/20260523_031941/summary.rpt
+PASS 29
 ```
 
 The tests do not yet cover all supported instruction forms, divide/remainder corner cases, randomized bus wait states, or long C-program execution.

@@ -50,9 +50,12 @@ Current directed cases:
 - `muldiv_stall.S`: dependent consumers after multi-cycle DIV/REM.
 - `hazard.S`: load-use, load-branch, and load-store hazard scenarios.
 - `hazard_branch_mem_stall.S`: taken branch in EX while an SBUS store stalls MEM (needs `hazard_branch_mem_stall.plusargs`; targets flush vs `stall_mem` in `hazard_unit.sv`).
-- `hazard_ibus_store_dup.S`: IBUS stall with store in MEM (needs `hazard_ibus_store_dup.plusargs`; targets `stall_id_ex` hack when `ex_mem_mem_write && ibus_stall`).
+- `hazard_ibus_store_dup.S`: IBUS stall with store in MEM (needs `hazard_ibus_store_dup.plusargs`; targets `stall_id_ex` when `ex_mem_mem_write && ibus_stall`).
+- `hazard_sbus_replay_smoke.S`: IBUS stall during one SBUS store to TORV UART at `0x4000_1000` (needs `hazard_sbus_replay_smoke.plusargs`; verifies no duplicate store after `dbus_completed`/`sbus_completed` fix).
 
-These two cases use testbench bus back-pressure (`+stall_sbus_writes` / `+stall_ibus_during_mem_write` in `sim/tb_rv32im_top.sv`). They are listed in `regress/cases/core.list` and also in `regress/cases/deep_hazard.list` for focused runs.
+The `hazard_*` cases above use testbench bus back-pressure in `sim/tb_torv_soc.sv`. They are in `regress/cases/soc.list` and focused hazard lists.
+
+**PULP UART** peripheral and AHB replay cases live under `tests/periph/apb_uart_sv/` — see `tests/periph/README.md` and `ip/README.md`.
 
 ## Running tests
 

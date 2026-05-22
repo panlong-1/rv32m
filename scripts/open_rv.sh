@@ -108,8 +108,10 @@ open_rv32m_path_prepend "$RV32M_RISCV_TOOLCHAIN_BIN"
 [[ -n "${RV32M_VERDI_HOME}" && -d "${RV32M_VERDI_HOME}/bin" ]] && open_rv32m_path_prepend "${RV32M_VERDI_HOME}/bin"
 [[ -n "${RV32M_VCS_HOME}" && -d "${RV32M_VCS_HOME}/bin" ]] && open_rv32m_path_prepend "${RV32M_VCS_HOME}/bin"
 
-export RV32M_FILELIST_CORE="$RV32M_ROOT/sim/filelists/verdi_core.f"
-export RV32M_FILELIST_AHB="$RV32M_ROOT/sim/filelists/verdi_ahb.f"
+export RV32M_FILELIST_SOC="$RV32M_ROOT/sim/filelists/verdi_soc.f"
+export RV32M_FILELIST_CORE="$RV32M_FILELIST_SOC"
+export RV32M_FILELIST_AHB="$RV32M_FILELIST_SOC"
+export RV32M_TARGET="${RV32M_TARGET:-soc}"
 export RV32M_LAST_CASE_DIR_FILE="${RV32M_ROOT}/.open_rv32m_last_case_build_dir"
 
 t() {
