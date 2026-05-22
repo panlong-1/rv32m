@@ -424,8 +424,10 @@ module rv32im_core (
       dbus_completed <= 1'b0;
       sbus_completed <= 1'b0;
     end else if (!stall_ex_mem) begin
-      dbus_completed <= 1'b0;
-      sbus_completed <= 1'b0;
+      if (!ex_mem_mem_write)
+        dbus_completed <= 1'b0;
+      if (!ex_mem_mem_read && !ex_mem_mem_write)
+        sbus_completed <= 1'b0;
     end else begin
       if (dbus_valid_w && dbus_ready && ex_mem_mem_write)
         dbus_completed <= 1'b1;
