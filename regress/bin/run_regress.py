@@ -171,51 +171,9 @@ def main() -> int:
         case_dir.mkdir(parents=True, exist_ok=True)
 
         if case.kind == "builtin":
-            case_env = env.copy()
-            if args.sim == "vcs":
-                case_env["VCS_BUILD_DIR"] = str(case_dir / "vcs")
-                case_env["OUT"] = str(case_dir / "vcs" / "simv")
-                if args.fsdb:
-                    case_env["RV32M_NEED_FSDB"] = "1"
-                if run([str(root / "scripts/vcs_build.sh")], root, case_dir / "vcs_build.log", case_env) != 0:
-                    summary.append((case.name, "FAIL", str(case_dir / "vcs_build.log")))
-                    continue
-                plusargs = []
-                if args.waves:
-                    plusargs += ["+vcd", f"+vcdfile={case_dir / (case.name + '.vcd')}"]
-                if args.fsdb:
-                    plusargs += ["+fsdb", f"+fsdbfile={case_dir / (case.name + '.fsdb')}"]
-                if args.trace:
-                    plusargs.append("+trace")
-                if args.pc_trace or args.pc_trace_each_cycle:
-                    plusargs += ["+pc_trace", f"+pc_trace_file={case_dir / 'pc_trace.tsv'}"]
-                if args.pc_trace_each_cycle:
-                    plusargs.append("+pc_trace_each_cycle")
-                log = case_dir / f"{case.name}.sim.log"
-                rc = run([str(case_dir / "vcs" / "simv"), *plusargs, "-l", str(log)], case_dir, None, case_env)
-                text = log.read_text(encoding="utf-8", errors="ignore") if log.exists() else ""
-                ok = rc == 0 and "All tb_rv32im_top checks passed." in text
-            else:
-                case_env["VERILATOR_BUILD_DIR"] = str(case_dir / "verilator")
-                case_env["RV32M_VERILATOR_TOP"] = "tb_rv32im_top"
-                if run([str(root / "scripts/verilator_build.sh")], root, case_dir / "verilator_build.log", case_env) != 0:
-                    summary.append((case.name, "FAIL", str(case_dir / "verilator_build.log")))
-                    continue
-                plusargs = []
-                if args.waves:
-                    plusargs += ["+vcd", f"+vcdfile={case_dir / (case.name + '.vcd')}"]
-                if args.trace:
-                    plusargs.append("+trace")
-                if args.pc_trace or args.pc_trace_each_cycle:
-                    plusargs += ["+pc_trace", f"+pc_trace_file={case_dir / 'pc_trace.tsv'}"]
-                if args.pc_trace_each_cycle:
-                    plusargs.append("+pc_trace_each_cycle")
-                log = case_dir / f"{case.name}.sim.log"
-                vl_exe = case_dir / "verilator" / "obj_dir" / "Vtb_rv32im_top"
-                rc = run([str(vl_exe), *plusargs], case_dir, log, case_env)
-                text = log.read_text(encoding="utf-8", errors="ignore") if log.exists() else ""
-                ok = rc == 0 and "All tb_rv32im_top checks passed." in text
-        elif case.kind == "asm":
+            summary.append((case.name, "SKIP", "builtin removed; use TORV asm tests (soc.list)"))
+            continue
+        if case.kind == "asm":
             case_env = env.copy()
             case_env["BUILD_DIR"] = str(case_dir)
             case_env["MAX_CYCLES"] = str(case.max_cycles)

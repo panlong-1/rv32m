@@ -1,7 +1,7 @@
 # =============================================================================
 # replay_div_store.S — AHB replay: SW to UART THR then DIV (div_busy holds MEM)
 #
-# PULP UART THR push count checked in tb_rv32im_ahb_top (uart_thr_push_count).
+# PULP UART THR push count checked in tb_torv_soc (uart_thr_push_count).
 # Requires replay_div_store.plusargs (+replay_expect=1).
 # =============================================================================
   .section .text.init

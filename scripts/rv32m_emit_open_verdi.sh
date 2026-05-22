@@ -4,8 +4,8 @@ set -euo pipefail
 BUILD_DIR="${1:?}"
 NAME="${2:?}"
 ROOT="${3:?}"
-TOP="${4:-tb_rv32im_top}"
-FLIST_REL="${5:-sim/filelists/verdi_core.f}"
+TOP="${4:-tb_torv_soc}"
+FLIST_REL="${5:-sim/filelists/verdi_soc.f}"
 
 OUT="$BUILD_DIR/open_verdi.sh"
 cat >"$OUT" <<EOF
