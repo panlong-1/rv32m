@@ -124,8 +124,8 @@ module hazard_unit (
         // re-capturing the same instruction after a completed beat was bubbled.
         stall_ex_mem = (dbus_valid || sbus_valid || stall_id_ex);
       end else if (ex_mem_mem_read) begin
-        // A completed load must advance into MEM/WB even if IF is still waiting;
-        // otherwise load-use / load-store forwarding loses the returned data.
+        // BYG-006: stall_ex_mem stays 0 here — see docs/bugs/byg_torv_soc_debug.md.
+        // Do not advance EX/MEM while stall_id_ex without an explicit stall_ex_mem=1.
       end else if (ibus_stall && ex_mem_mem_write) begin
         // Store beat is complete and rv32im_core has masked req_valid, so clear
         // EX/MEM while ID/EX remains frozen. This avoids an infinite completed

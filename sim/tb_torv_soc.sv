@@ -9,6 +9,7 @@ module tb_torv_soc;
   logic        uart_tx;
   logic [7:0]  uart_thr_push_count;
   logic [4:0]  uart_tx_fifo_depth_max;
+  logic [7:0]  uart_rbr_read_count;
 
   torv_soc_top dut (
     .hclk(hclk),
@@ -17,7 +18,8 @@ module tb_torv_soc;
     .sbus_stall_hold(sbus_stall_hold),
     .uart_tx(uart_tx),
     .uart_thr_push_count(uart_thr_push_count),
-    .uart_tx_fifo_depth_max(uart_tx_fifo_depth_max)
+    .uart_tx_fifo_depth_max(uart_tx_fifo_depth_max),
+    .uart_rbr_read_count(uart_rbr_read_count)
   );
 
   localparam logic [1:0] HTRANS_IDLE = 2'b00;
@@ -32,8 +34,8 @@ module tb_torv_soc;
   logic [7:0] ibus_stall_cnt;
   logic       ibus_stall_armed;
   logic       ibus_stall_done;
-  wire        mem_store_active =
-      dut.u_cpu.u_core.ex_mem_mem_write &&
+  wire        mem_bus_active =
+      (dut.u_cpu.u_core.ex_mem_mem_write || dut.u_cpu.u_core.ex_mem_mem_read) &&
       (dut.u_cpu.u_core.sbus_valid || dut.u_cpu.u_core.dbus_valid);
 
   // +stall_sbus_writes=N (SBUS SRAM path only, not APB UART)
@@ -70,7 +72,7 @@ module tb_torv_soc;
       end
 
       if (stall_ibus_len > 0) begin
-        if (!ibus_stall_done && mem_store_active) begin
+        if (!ibus_stall_done && mem_bus_active) begin
           ibus_stall_armed <= 1'b1;
           ibus_stall_done  <= 1'b1;
         end
@@ -114,7 +116,9 @@ module tb_torv_soc;
   int sbus_write_count;
   int periph_tx_count;
   int replay_expect;
+  int replay_expect_rbr;
   wire [7:0] periph_tx_count_hw = uart_thr_push_count;
+  wire [7:0] periph_rbr_count_hw = uart_rbr_read_count;
 
   logic        s_data_valid_q;
   logic        s_write_q;
@@ -218,8 +222,13 @@ module tb_torv_soc;
                    periph_tx_count_hw, replay_expect);
             $finish(1);
           end
-          $display("[PASS] TORV tohost signalled success (periph_tx=%0d)",
-                   periph_tx_count_hw);
+          if (replay_expect_rbr > 0 && periph_rbr_count_hw != replay_expect_rbr) begin
+            $error("[FAIL] TORV UART RBR read count %0d != expected %0d",
+                   periph_rbr_count_hw, replay_expect_rbr);
+            $finish(1);
+          end
+          $display("[PASS] TORV tohost signalled success (periph_tx=%0d rbr=%0d)",
+                   periph_tx_count_hw, periph_rbr_count_hw);
           $finish(0);
         end else begin
           $display("[PERF] periph_tx_hw=%0d (replay_expect %0d)",
@@ -235,6 +244,21 @@ module tb_torv_soc;
     hclk = 1'b0;
     forever #5 hclk = ~hclk;
   end
+
+  // Sim-only: push one byte into the PULP UART RX FIFO (no serial bit-bang).
+  task automatic uart_inject_rx_byte(input [7:0] byte_val);
+    begin
+      @(posedge hclk);
+      force dut.u_apb_uart.uart_rx_fifo_i.valid_i = 1'b1;
+      force dut.u_apb_uart.uart_rx_fifo_i.data_i  = {1'b0, byte_val};
+      @(posedge hclk);
+      while (!dut.u_apb_uart.uart_rx_fifo_i.ready_o)
+        @(posedge hclk);
+      @(posedge hclk);
+      release dut.u_apb_uart.uart_rx_fifo_i.valid_i;
+      release dut.u_apb_uart.uart_rx_fifo_i.data_i;
+    end
+  endtask
 
   task automatic clear_memories;
     int i;
@@ -263,8 +287,10 @@ module tb_torv_soc;
 
     max_cycles = 20000;
     replay_expect = 0;
+    replay_expect_rbr = 0;
     void'($value$plusargs("max_cycles=%d", max_cycles));
     void'($value$plusargs("replay_expect=%d", replay_expect));
+    void'($value$plusargs("replay_expect_rbr=%d", replay_expect_rbr));
     $readmemh(imem_hex, dut.u_i_sram.mem);
     if ($value$plusargs("dmem=%s", dmem_hex))
       $readmemh(dmem_hex, dut.u_d_sram.mem);
@@ -272,6 +298,12 @@ module tb_torv_soc;
     hresetn = 1'b0;
     repeat (6) @(posedge hclk);
     hresetn = 1'b1;
+
+    begin
+      int uart_rx_byte;
+      if ($value$plusargs("uart_rx_byte=%h", uart_rx_byte))
+        uart_inject_rx_byte(uart_rx_byte[7:0]);
+    end
 
     repeat (max_cycles) @(posedge hclk);
     if (replay_expect > 0) begin

@@ -1,0 +1,4 @@
++stall_ibus_during_mem_write=16
++uart_rx_byte=AB
++replay_expect_rbr=1
++max_cycles=25000

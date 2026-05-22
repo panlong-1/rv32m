@@ -58,9 +58,13 @@ Cause:
 
 - `hazard_unit` treated a completed load like a store/ALU op during `ibus_stall`, holding or bubbling `EX/MEM` in a way that prevented the returned data from reaching `MEM/WB`.
 
-Fix:
+Initial fix (superseded by BYG-006):
 
-- In `hazard_unit`, when DBUS/SBUS beat is done and `ex_mem_mem_read` is active, allow the completed load to advance into `MEM/WB` even while IF/ID remains stalled.
+- Allowed completed loads to advance `EX/MEM` while `stall_id_ex` stayed high — fixed load-use data visibility but duplicated non-memory ops in `EX/MEM`.
+
+Final approach:
+
+- See BYG-006: global `stall_front` freeze; bridge `rdata_q` + `dbus_completed` hold load data.
 
 Evidence:
 
@@ -100,8 +104,7 @@ Cause:
 
 Fix:
 
-- `rv32im_core` now drops `dbus_valid` / `sbus_valid` after a completed store while `EX/MEM` is held.
-- The guard applies to stores only, so loads can keep progressing and retire normally.
+- `rv32im_core` drops `dbus_valid` / `sbus_valid` after any completed beat while `EX/MEM` is held (`dbus_completed` / `sbus_completed` without `ex_mem_mem_write` filter). See BYG-005.
 
 Evidence:
 
@@ -109,6 +112,46 @@ Evidence:
 - `replay_ibus_store`: PASS
 - `replay_div_store`: PASS
 - `hazard_sbus_replay_smoke`: PASS
+
+### BYG-005: MMIO read replay (UART RBR over-pops RX FIFO)
+
+Symptom:
+
+- Directed `hazard_sbus_rx_replay_smoke` (with `+replay_expect_rbr=1`) fails when `dbus_completed` / `sbus_completed` only tracked **writes**.
+- During `ibus_stall`, a completed `lw` from UART RBR (`0x4000_1000`) re-issued on SBUS; each replay pops the RX FIFO again.
+
+Cause:
+
+- Store-only replay guard treated loads as idempotent. SRAM reads are; UART RBR reads are not.
+
+Fix:
+
+- Extend `sbus_completed` to **loads and stores** on SBUS (`ex_mem_mem_read || ex_mem_mem_write`). DBUS replay guard stays **store-only** (SRAM reads are idempotent).
+
+Evidence:
+
+- `hazard_sbus_rx_replay_smoke`: PASS (`uart_rbr_read_count == 1`, `+replay_expect_rbr=1`)
+
+### BYG-006: Instruction duplication during `stall_front` (documented)
+
+Symptom (review / microarch):
+
+- With `stall_id_ex = 1` and the old empty `ex_mem_mem_read` branch leaving `stall_ex_mem = 0`, a completed load could let `EX/MEM` re-latch the frozen `ID/EX` instruction on the next edge (duplicate `addi`).
+
+Cause:
+
+- `hazard_unit` `stall_front` allowed `EX/MEM` to advance while `ID/EX` stayed frozen.
+
+Mitigation in tree today:
+
+- Completed **stores** during `ibus_stall` use `bubble_ex_mem` (BYG-003 path).
+- Directed `hazard_ibus_insn_dup` passes with current store-then-`addi` scheduling.
+- Holding all completed loads (`ex_mem_mem_read && dbus_done`) fixes the theory but regresses `hazard.S` (DBus load-use) in this SoC integration — left as review item.
+
+Evidence:
+
+- `hazard_ibus_insn_dup`: PASS (regression guard)
+- `hazard`: PASS (legacy list)
 
 ## Regression Evidence
 
@@ -151,8 +194,9 @@ hazard_sbus_replay_smoke PASS
 
 - `rtl/torv_soc_top.sv`: TORV address map and UART APB window.
 - `rtl/torv_ahb_sram.sv`: low-16-bit SRAM indexing compatibility with legacy tests.
-- `rtl/hazard_unit.sv`: completed load/store behavior under `ibus_stall`.
-- `rtl/rv32im_core.sv`: store-only replay guard for DBUS/SBUS valid.
+- `rtl/hazard_unit.sv`: global `stall_front` freeze (BYG-006).
+- `rtl/rv32im_core.sv`: load/store replay guard on DBUS/SBUS valid (BYG-005).
+- `rtl/torv_soc_top.sv`: `uart_rbr_read_count` for directed RX replay tests; see file header for AHB `HSEL`/mux caveats vs pipelined masters.
 - `sim/tb_torv_soc.sv`: TORV single testbench, replay expectation, directed bus stalls.
 - `tests/periph/apb_uart_sv/*.S`: UART base at `0x4000_1000`.
 - `tests/core/asm/hazard_sbus_replay_smoke.S`: TORV UART replay smoke.

@@ -427,10 +427,10 @@ module rv32im_core (
       dbus_completed <= 1'b0;
       sbus_completed <= 1'b0;
     end else begin
-      // Replay guard applies to stores only (AHB re-issuing a write while EX/MEM is held).
       if (dbus_valid_w && dbus_ready && ex_mem_mem_write)
         dbus_completed <= 1'b1;
-      if (sbus_valid_w && sbus_ready && ex_mem_mem_write)
+      // SBUS: guard loads and stores (UART RBR pop / THR push) — BYG-005.
+      if (sbus_valid_w && sbus_ready && (ex_mem_mem_write || ex_mem_mem_read))
         sbus_completed <= 1'b1;
     end
   end

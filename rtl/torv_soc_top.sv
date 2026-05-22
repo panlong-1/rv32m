@@ -12,6 +12,12 @@
 //   0x4000_0000 .. (via [15:0]) SBUS data SRAM (core asm tests)
 //   0x4000_1000 .. 0x4000_1FFF  APB UART (periph asm tests)
 //   0xF000_0000                 tohost (monitored by tb_torv_soc, not decoded here)
+//
+// AHB note: s_periph_sel and s_bridge_hsel use the current address phase. This matches
+// the single-beat rv32im_ahb_bridge master (HADDR held until HREADY). For pipelined
+// DMA or strict AMBA compliance, register the peripheral select on HREADY and mux
+// data-phase HRDATA/HREADY from the latched decode; keep HSEL address-only (not gated
+// by HTRANS_IDLE) per ARM AMBA guidance.
 `timescale 1ns / 1ps
 
 module torv_soc_top #(
@@ -32,7 +38,8 @@ module torv_soc_top #(
 
   output logic        uart_tx,
   output logic [7:0]  uart_thr_push_count,
-  output logic [4:0]  uart_tx_fifo_depth_max
+  output logic [4:0]  uart_tx_fifo_depth_max,
+  output logic [7:0]  uart_rbr_read_count
 );
   localparam logic [1:0] HTRANS_IDLE = 2'b00;
 
@@ -228,15 +235,22 @@ module torv_soc_top #(
     .event_o()
   );
 
+  wire apb_uart_rbr_read =
+      apb_psel && apb_penable && !apb_pwrite && (apb_paddr[2:0] == 3'b000) &&
+      !u_apb_uart.regs_q[3][7]; // RBR, not DLL (LCR.DLAB)
+
   always_ff @(posedge hclk or negedge hresetn) begin
     if (!hresetn) begin
       uart_tx_fifo_depth_max <= 5'd0;
       uart_thr_push_count    <= 8'd0;
+      uart_rbr_read_count    <= 8'd0;
     end else begin
       if (u_apb_uart.tx_elements > uart_tx_fifo_depth_max)
         uart_tx_fifo_depth_max <= u_apb_uart.tx_elements;
       if (u_apb_uart.fifo_tx_valid)
         uart_thr_push_count <= uart_thr_push_count + 8'd1;
+      if (apb_uart_rbr_read && apb_pready)
+        uart_rbr_read_count <= uart_rbr_read_count + 8'd1;
     end
   end
 
