@@ -76,16 +76,37 @@ Examples:
 ./scripts/run_case.sh --target ahb tests/periph/apb_uart_sv/uart_smoke.S
 
 # Custom output directory
-./scripts/run_case.sh --sim vcs --target ahb --fsdb \
-  --build-dir build/debug/sbus_ahb tests/core/asm/sbus.S
+./scripts/run_case.sh --sim vcs --fsdb \
+  --build-dir build/debug/sbus tests/core/asm/sbus.S
 ```
 
-Default output:
+Default output (all targets use TORV SoC; `--target core|ahb` are legacy aliases):
 
 ```text
-build/sim/core/<case>/
-build/sim/ahb/<case>/
+build/sim/soc/<case>/
 ```
+
+## Program loading (ELF / HEX)
+
+The CPU does **not** load ELF at runtime. `run_case.sh` builds a memory image and the testbench loads it **before reset**:
+
+| Step | What happens |
+|------|----------------|
+| 1 | `riscv-*-gcc` + `tests/core/link.ld` → `build/sim/soc/<case>/<case>.elf` (`.text` linked at **`0x0000_0000`**) |
+| 2 | `objcopy -O verilog` → `<case>.hex` |
+| 3 | Simulator runs with **`+imem=<case>.hex`** → image copied into **instruction SRAM** |
+| 4 | Optional **`+dmem=<file>.hex`** → **data SRAM** (most asm tests omit this; data is filled by stores at **`0x2000_0000`**) |
+| 5 | Reset released; core fetches from **PC = 0x0** |
+
+**For software developers**
+
+- Keep building **ELF** for debug (`objdump`, GDB). ELF is the toolchain source of truth.
+- Our script auto-generates **`.hex` for simulation**; you do not need a manual conversion step when using `run_case.sh`.
+- To run only your ELF: `objcopy -O verilog prog.elf prog.hex`, then pass `+imem=prog.hex` (or ask us to hook your build into `run_case.sh`).
+
+**Silicon / FPGA** (not covered in detail here): same ELF is usually converted to a flat **`.bin`** plus a **boot path** (Flash, UART loader, or BRAM init in the bitstream). The chip does not parse ELF.
+
+Memory map: [docs/torv_address_map.md](../docs/torv_address_map.md). Short software-focused summary: [docs/loading.md](../docs/loading.md).
 
 Typical contents:
 
@@ -149,8 +170,8 @@ Case lists (default when `--case-list` omitted):
 
 | `--target` | Default list |
 |------------|----------------|
-| `soc` | `regress/cases/soc.list` (29 asm cases) |
-| `core` / `ahb` | legacy lists, still run through TORV SoC |
+| `soc` | `regress/cases/soc.list` (32 asm cases) |
+| `core` / `ahb` | legacy lists; simulation still uses TORV SoC (`tb_torv_soc`) |
 
 Other lists: `deep_hazard.list`, `periph_replay.list`, `periph.list`, `ahb_replay.list`.
 
@@ -203,8 +224,7 @@ Built-in perf cases:
 Extract from a run:
 
 ```bash
-rg "\[PERF\]" regress/results/<run>/<target>/*/*.sim.log
-rg "\[PERF\]" regress/results/<run>/<target>/*/*.ahb.sim.log
+rg "\[PERF\]" regress/results/<run>/soc/*/*.sim.log
 ```
 
 ## Test termination
@@ -314,7 +334,7 @@ Scripts also try `LINUXAMD64`.
 ## Verdi
 
 ```bash
-cd build/sim/core/alu
+cd build/sim/soc/alu
 ./open_verdi.sh
 ```
 
