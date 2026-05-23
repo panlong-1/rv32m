@@ -42,7 +42,7 @@ Prerequisites: **Verilator**, **RISC-V GNU toolchain** (`riscv32-unknown-elf-gcc
    ./scripts/regress.sh
    ```
 
-More detail: [sim/SIM_README.md](sim/SIM_README.md), [regress/README.md](regress/README.md), [tests/core/README.md](tests/core/README.md), [tests/periph/README.md](tests/periph/README.md), [ip/README.md](ip/README.md), [spec/RV32IM_Current_Implementation.md](spec/RV32IM_Current_Implementation.md).
+More detail: [sim/SIM_README.md](sim/SIM_README.md), [docs/loading.md](docs/loading.md), [regress/README.md](regress/README.md), [tests/core/README.md](tests/core/README.md), [tests/periph/README.md](tests/periph/README.md), [ip/README.md](ip/README.md), [spec/RV32IM_Current_Implementation.md](spec/RV32IM_Current_Implementation.md).
 
 ## Environment
 
