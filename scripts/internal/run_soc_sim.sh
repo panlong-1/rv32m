@@ -3,7 +3,7 @@
 # use:  scripts/run_case.sh [options] <asm.S>
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT="$(builtin cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=rv32m_verdi_pli.inc.sh
 source "$ROOT/scripts/rv32m_verdi_pli.inc.sh"
 export RV32M_ROOT="${RV32M_ROOT:-$ROOT}"
@@ -12,8 +12,15 @@ if [[ ! -f "$ROOT/ip/third_party/socbus/rtl/AHB_APB_BRIDGE.v" ]]; then
   "$ROOT/scripts/fetch_ip.sh"
 fi
 
-PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$ROOT/.." && pwd)}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(builtin cd "$ROOT/.." && pwd)}"
+if [[ "${PROJECT_ROOT:-}" != /* ]]; then
+  PROJECT_ROOT="$(builtin cd "$ROOT/.." && pwd)"
+fi
 TOOLCHAIN="${TOOLCHAIN:-$PROJECT_ROOT/riscv_toolchain/bin}"
+if [[ "${TOOLCHAIN:-}" != /* ]] \
+   || [[ ! -x "${TOOLCHAIN}/${PREFIX:-riscv64-unknown-elf-}gcc" ]]; then
+  TOOLCHAIN="$PROJECT_ROOT/riscv_toolchain/bin"
+fi
 PREFIX="${PREFIX:-riscv64-unknown-elf-}"
 SRC="${1:-$ROOT/tests/core/asm/smoke.S}"
 NAME="$(basename "$SRC")"
