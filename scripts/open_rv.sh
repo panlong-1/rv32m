@@ -17,15 +17,22 @@ if [[ -z "${BASH_VERSION:-}" ]]; then
   echo "open_rv32m: source scripts/open_rv.sh from bash (required for path detection)." >&2
   return 2 2>/dev/null || exit 2
 fi
-_open_rv_here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export RV32M_ROOT="${RV32M_ROOT:-$(cd "${_open_rv_here}/.." && pwd)}"
-_open_rv_project_root="$(cd "${RV32M_ROOT}/.." && pwd)"
+# Use builtin cd: a user cd() that runs ls (e.g. auto-list after cd) breaks $(cd ... && pwd).
+_open_rv_here="$(builtin cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export RV32M_ROOT="${RV32M_ROOT:-$(builtin cd "${_open_rv_here}/.." && pwd)}"
+_open_rv_project_root="$(builtin cd "${RV32M_ROOT}/.." && pwd)"
 # Ignore a non-absolute PROJECT_ROOT from the parent shell (e.g. accidental "bin").
 if [[ "${PROJECT_ROOT:-}" != /* ]]; then
   PROJECT_ROOT="$_open_rv_project_root"
 fi
 export PROJECT_ROOT
 unset _open_rv_project_root
+
+# Drop stale relative toolchain paths (e.g. PROJECT_ROOT=bin from a broken prior source).
+if [[ "${RV32M_RISCV_TOOLCHAIN_BIN:-}" != /* ]] \
+   || [[ ! -x "${RV32M_RISCV_TOOLCHAIN_BIN}/${RV32M_RISCV_GNU_PREFIX:-riscv64-unknown-elf-}gcc" ]]; then
+  unset RV32M_RISCV_TOOLCHAIN_BIN TOOLCHAIN
+fi
 
 # =============================================================================
 # Site defaults — edit here for your machine (no manual export before source).
