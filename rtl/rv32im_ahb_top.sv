@@ -39,6 +39,7 @@ module rv32im_ahb_top (
   logic        ibus_valid;
   logic        ibus_ready;
   logic [31:0] ibus_addr;
+  logic [31:0] ibus_next_addr;
   logic [31:0] ibus_rdata;
 
   logic        dbus_valid;
@@ -63,6 +64,7 @@ module rv32im_ahb_top (
     .ibus_valid(ibus_valid),
     .ibus_ready(ibus_ready),
     .ibus_addr(ibus_addr),
+    .ibus_next_addr(ibus_next_addr),
     .ibus_rdata(ibus_rdata),
     .dbus_valid(dbus_valid),
     .dbus_ready(dbus_ready),
@@ -80,15 +82,12 @@ module rv32im_ahb_top (
     .sbus_rdata(sbus_rdata)
   );
 
-  rv32im_ahb_bridge #(.STRICT_ADDR_MATCH(1'b1)) u_i_bridge (
+  rv32im_ahb_fetch u_i_fetch (
     .hclk(hclk),
     .hresetn(hresetn),
-    .req_valid(ibus_valid),
     .req_ready(ibus_ready),
     .req_addr(ibus_addr),
-    .req_we(1'b0),
-    .req_be(4'b1111),
-    .req_wdata(32'd0),
+    .req_next_addr(ibus_next_addr),
     .req_rdata(ibus_rdata),
     .haddr(i_haddr),
     .htrans(i_htrans),

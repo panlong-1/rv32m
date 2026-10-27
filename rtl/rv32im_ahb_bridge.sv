@@ -1,8 +1,8 @@
-// Single-beat AHB-Lite bridge for the core's simple valid/ready bus.
+// Single-beat AHB-Lite bridge for the core's simple valid/ready bus (DBUS/SBUS;
+// IBUS uses the pipelined rv32im_ahb_fetch).
 //
-// IBUS: req_addr (core PC) can change while a fetch is in flight (branch, jalr,
-// flush). When STRICT_ADDR_MATCH=1, req_ready only pulses if req_addr still
-// equals addr_q so IF never latches a stale instruction.
+// STRICT_ADDR_MATCH=1: req_ready only pulses if req_addr still equals addr_q,
+// for masters whose address can change while a beat is in flight.
 //
 // DBUS/SBUS: req_addr is the LSU address and is not guaranteed stable against
 // ex_mem updates in the same clock phase as ST_DONE; leave STRICT_ADDR_MATCH=0

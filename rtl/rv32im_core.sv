@@ -12,6 +12,7 @@ module rv32im_core (
   output logic        ibus_valid,
   input  logic        ibus_ready,
   output logic [31:0] ibus_addr,
+  output logic [31:0] ibus_next_addr,
   input  logic [31:0] ibus_rdata,
   output logic        dbus_valid,
   input  logic        dbus_ready,
@@ -78,6 +79,8 @@ module rv32im_core (
 
   assign ibus_valid = 1'b1;
   assign ibus_addr  = pc;
+  // PC of the next cycle; the pipelined fetch issues it as the AHB address phase.
+  assign ibus_next_addr = stall_pc_h ? pc : pc_next;
 
   logic        d_reg_write;
   logic        d_mem_read;
