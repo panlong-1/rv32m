@@ -21,7 +21,7 @@ VERILOG_FILES:
   - dir::../rtl/hazard_unit.sv
   - dir::../rtl/lsu.sv
   - dir::../rtl/rv32im_core.sv
-  - dir::../rtl/rv32im_ahb_bridge.sv
+  - dir::../rtl/rv32im_ahb_dport.sv
   - dir::../rtl/rv32im_ahb_fetch.sv
   - dir::../rtl/rv32im_ahb_top.sv
 VERILOG_INCLUDE_DIRS:

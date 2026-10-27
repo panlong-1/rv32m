@@ -11,7 +11,7 @@ $RV32M_ROOT/rtl/forwarding_unit.sv
 $RV32M_ROOT/rtl/hazard_unit.sv
 $RV32M_ROOT/rtl/lsu.sv
 $RV32M_ROOT/rtl/rv32im_core.sv
-$RV32M_ROOT/rtl/rv32im_ahb_bridge.sv
+$RV32M_ROOT/rtl/rv32im_ahb_dport.sv
 $RV32M_ROOT/rtl/rv32im_ahb_fetch.sv
 $RV32M_ROOT/rtl/rv32im_ahb_top.sv
 $RV32M_ROOT/rtl/torv_ahb_sram.sv

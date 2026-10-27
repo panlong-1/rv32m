@@ -1,40 +1,33 @@
 // Hazard / pipeline control (spec §9)
 //
-// Bus-interaction fixes (2026-05):
-//   Bug1 — flush is suppressed while stall_mem is active so a taken branch in EX
-//          is not cleared before PC can take the target after DBUS/SBUS stall.
-//   Bug2 / BYG-006 — stall_front (IBUS/div_busy); explicit stall_ex_mem; completed
-//          load retires MEM/WB; completed store bubbles EX/MEM (BYG-003).
+// Pipelined buses (IBUS fetch, DBUS/SBUS address phase in EX, data phase in
+// MEM) make the back end simple: only a bus wait state (HREADY low on a bus
+// with an active address or data phase) freezes the whole pipeline. Every other
+// hazard stops the front end and inserts a bubble behind it, so MEM/WB keep
+// draining and a load/store is never issued twice.
+//
+// Priority: bus_stall > flush > div_busy > load_use > IBUS not ready.
 module hazard_unit (
   input  logic        id_ex_mem_read,
   input  logic [4:0]  id_ex_rd,
   input  logic [31:0] if_id_inst,
-  input  logic        ex_mem_mem_read,
-  input  logic        ex_mem_mem_write,
   input  logic        ex_branch_taken,
-  input  logic        ibus_valid,
   input  logic        ibus_ready,
-  input  logic        dbus_valid,
-  input  logic        dbus_valid_stall,
-  input  logic        dbus_ready,
-  input  logic        sbus_valid,
-  input  logic        sbus_valid_stall,
-  input  logic        sbus_ready,
+  input  logic        bus_stall,
   input  logic        div_busy,
   output logic        flush,
   output logic        stall_pc,
   output logic        stall_if_id,
+  output logic        bubble_if_id,
   output logic        stall_id_ex,
+  output logic        bubble_id_ex,
   output logic        stall_ex_mem,
   output logic        bubble_ex_mem,
-  output logic        bubble_id_ex
+  output logic        stall_mem_wb
 );
-  localparam logic [6:0] OP_LOAD  = 7'b0000011;
   localparam logic [6:0] OP_STORE = 7'b0100011;
   localparam logic [6:0] OP_BR    = 7'b1100011;
   localparam logic [6:0] OP_JAL   = 7'b1101111;
-  localparam logic [6:0] OP_JALR  = 7'b1100111;
-  localparam logic [6:0] OP_IMM   = 7'b0010011;
   localparam logic [6:0] OP_AUIPC = 7'b0010111;
   localparam logic [6:0] OP_REG   = 7'b0110011;
   localparam logic [6:0] OP_LUI   = 7'b0110111;
@@ -50,8 +43,6 @@ module hazard_unit (
   assign rs2_f = if_id_inst[24:20];
 
   always_comb begin
-    uses_rs1 = 1'b1;
-    uses_rs2 = 1'b0;
     unique case (op)
       OP_JAL, OP_LUI, OP_AUIPC: uses_rs1 = 1'b0;
       default: uses_rs1 = 1'b1;
@@ -66,66 +57,39 @@ module hazard_unit (
   assign load_use = id_ex_mem_read && (id_ex_rd != 5'd0) &&
       (((id_ex_rd == rs1_f) && uses_rs1) || ((id_ex_rd == rs2_f) && uses_rs2));
 
-  logic ibus_stall;
-  logic dbus_stall;
-  logic sbus_stall;
-  logic mem_bus_stall;
-
-  assign ibus_stall     = ibus_valid && !ibus_ready;
-  assign dbus_stall = dbus_valid && !dbus_ready;
-  assign sbus_stall = sbus_valid && !sbus_ready;
-  assign mem_bus_stall  = dbus_stall || sbus_stall;
-
-  logic stall_mem;
-  assign stall_mem  = mem_bus_stall;
-
-  logic dbus_done;
-  logic sbus_done;
-  assign dbus_done = dbus_ready && (dbus_valid || dbus_valid_stall);
-  assign sbus_done = sbus_ready && (sbus_valid || sbus_valid_stall);
-
-  // load_use has its own branch; this is IBUS / div_busy only (see elsif order).
-  logic stall_front;
-  assign stall_front = ibus_stall || div_busy;
+  // A taken branch cannot leave EX while the pipeline is frozen.
+  assign flush = ex_branch_taken && !bus_stall;
 
   always_comb begin
-    flush       = ex_branch_taken && !stall_mem;
-    stall_pc    = 1'b0;
-    stall_if_id = 1'b0;
-    stall_id_ex = 1'b0;
-    stall_ex_mem = 1'b0;
+    stall_pc      = 1'b0;
+    stall_if_id   = 1'b0;
+    bubble_if_id  = 1'b0;
+    stall_id_ex   = 1'b0;
+    bubble_id_ex  = 1'b0;
+    stall_ex_mem  = 1'b0;
     bubble_ex_mem = 1'b0;
-    bubble_id_ex = 1'b0;
+    stall_mem_wb  = 1'b0;
 
-    if (stall_mem) begin
+    if (bus_stall) begin
       stall_pc     = 1'b1;
       stall_if_id  = 1'b1;
       stall_id_ex  = 1'b1;
       stall_ex_mem = 1'b1;
+      stall_mem_wb = 1'b1;
     end else if (flush) begin
+      // PC takes the target; IF/ID and ID/EX are cleared by flush.
+    end else if (div_busy) begin
+      stall_pc      = 1'b1;
+      stall_if_id   = 1'b1;
+      stall_id_ex   = 1'b1;
+      bubble_ex_mem = 1'b1;
     end else if (load_use) begin
       stall_pc     = 1'b1;
       stall_if_id  = 1'b1;
       bubble_id_ex = 1'b1;
-    end else if (stall_front) begin
+    end else if (!ibus_ready) begin
       stall_pc     = 1'b1;
-      stall_if_id  = 1'b1;
-      stall_id_ex  = 1'b1;
-      if (!dbus_done && !sbus_done) begin
-        stall_ex_mem = (dbus_valid || sbus_valid || stall_id_ex);
-      end else if (ex_mem_mem_read) begin
-        // Completed load: retire into MEM/WB while ID/EX stays frozen.
-        stall_ex_mem = 1'b0;
-      end else if (ibus_stall && ex_mem_mem_write) begin
-        // Completed store: bubble EX/MEM (needs stall_ex_mem=0 to latch bubble).
-        bubble_ex_mem = 1'b1;
-        stall_ex_mem  = 1'b0;
-      end else if (ibus_stall) begin
-        stall_ex_mem = 1'b1;
-      end else begin
-        bubble_ex_mem = 1'b1;
-        stall_ex_mem  = 1'b0;
-      end
+      bubble_if_id = 1'b1;
     end
   end
 endmodule

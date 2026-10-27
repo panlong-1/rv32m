@@ -36,7 +36,6 @@ module rv32im_ahb_top (
   input  logic        s_hready,
   input  logic        s_hresp
 );
-  logic        ibus_valid;
   logic        ibus_ready;
   logic [31:0] ibus_addr;
   logic [31:0] ibus_next_addr;
@@ -44,6 +43,7 @@ module rv32im_ahb_top (
 
   logic        dbus_valid;
   logic        dbus_ready;
+  logic        dbus_dph;
   logic [31:0] dbus_addr;
   logic        dbus_we;
   logic [3:0]  dbus_be;
@@ -52,6 +52,7 @@ module rv32im_ahb_top (
 
   logic        sbus_valid;
   logic        sbus_ready;
+  logic        sbus_dph;
   logic [31:0] sbus_addr;
   logic        sbus_we;
   logic [3:0]  sbus_be;
@@ -61,13 +62,13 @@ module rv32im_ahb_top (
   rv32im_core u_core (
     .clk(hclk),
     .rst_n(hresetn),
-    .ibus_valid(ibus_valid),
     .ibus_ready(ibus_ready),
     .ibus_addr(ibus_addr),
     .ibus_next_addr(ibus_next_addr),
     .ibus_rdata(ibus_rdata),
     .dbus_valid(dbus_valid),
     .dbus_ready(dbus_ready),
+    .dbus_dph(dbus_dph),
     .dbus_addr(dbus_addr),
     .dbus_we(dbus_we),
     .dbus_be(dbus_be),
@@ -75,6 +76,7 @@ module rv32im_ahb_top (
     .dbus_rdata(dbus_rdata),
     .sbus_valid(sbus_valid),
     .sbus_ready(sbus_ready),
+    .sbus_dph(sbus_dph),
     .sbus_addr(sbus_addr),
     .sbus_we(sbus_we),
     .sbus_be(sbus_be),
@@ -101,16 +103,17 @@ module rv32im_ahb_top (
     .hresp(i_hresp)
   );
 
-  rv32im_ahb_bridge #(.STRICT_ADDR_MATCH(1'b0)) u_d_bridge (
+  rv32im_ahb_dport u_d_port (
     .hclk(hclk),
     .hresetn(hresetn),
     .req_valid(dbus_valid),
-    .req_ready(dbus_ready),
     .req_addr(dbus_addr),
     .req_we(dbus_we),
     .req_be(dbus_be),
-    .req_wdata(dbus_wdata),
-    .req_rdata(dbus_rdata),
+    .dph_wdata(dbus_wdata),
+    .dph_active(dbus_dph),
+    .dph_rdata(dbus_rdata),
+    .bus_ready(dbus_ready),
     .haddr(d_haddr),
     .htrans(d_htrans),
     .hwrite(d_hwrite),
@@ -123,16 +126,17 @@ module rv32im_ahb_top (
     .hresp(d_hresp)
   );
 
-  rv32im_ahb_bridge #(.STRICT_ADDR_MATCH(1'b0)) u_s_bridge (
+  rv32im_ahb_dport u_s_port (
     .hclk(hclk),
     .hresetn(hresetn),
     .req_valid(sbus_valid),
-    .req_ready(sbus_ready),
     .req_addr(sbus_addr),
     .req_we(sbus_we),
     .req_be(sbus_be),
-    .req_wdata(sbus_wdata),
-    .req_rdata(sbus_rdata),
+    .dph_wdata(sbus_wdata),
+    .dph_active(sbus_dph),
+    .dph_rdata(sbus_rdata),
+    .bus_ready(sbus_ready),
     .haddr(s_haddr),
     .htrans(s_htrans),
     .hwrite(s_hwrite),

@@ -244,36 +244,36 @@ Misaligned access exceptions are not implemented. The current logic selects byte
 - MEM/WB to EX when the MEM/WB instruction writes a matching register
 - `x0` is never forwarded as a writable destination
 
+All three buses are pipelined AHB-Lite masters:
+
+- IBUS (`rv32im_ahb_fetch`): the core exports `ibus_next_addr = stall_pc ? pc : pc_next`, issued as the address phase; its data phase lines up with `pc` one cycle later (one fetch per cycle).
+- DBUS/SBUS (`rv32im_ahb_dport`): the address phase is issued from EX (`alu_y`, `addr_decode`, `lsu` in EX); the data phase is the MEM stage (store data from `ex_mem_store_data`, load data captured into MEM/WB). A zero-wait slave completes a load/store without stalling.
+- A request is presented only when the instruction leaves EX on the accepting edge, so each load/store is issued exactly once (no AHB/APB replay of UART THR/RBR side effects).
+- A data-bus request is presented only while the other data bus is ready, and a load/store in EX stalls while either data bus is not ready, so `bus_stall` does not depend on the EX address decode.
+
 `hazard_unit.sv` handles:
 
 - IF/ID source-use decoding
 - load-use bubble insertion when ID/EX is a load used by IF/ID
-- IBUS wait-state stall
-- DBUS/SBUS wait-state stall
-- branch/jump flush (`flush = ex_branch_taken && !stall_mem`)
+- bus wait states (`bus_stall`: HREADY low on a bus with an active address or data phase)
+- branch/jump flush (`flush = ex_branch_taken && !bus_stall`)
 - `div_busy` from multi-cycle divide in EX
+- IBUS not ready (no instruction fetched this cycle)
 
-`stall_mem` is **only** `mem_bus_stall` (DBUS/SBUS wait). `div_busy` stalls the front end via `stall_front`, not MEM — so MEM/WB can drain while divide runs in EX.
+Priority in the combinational hazard logic is:
 
-`rv32im_core` masks `dbus_valid` / `sbus_valid` after a completed handshake while `stall_ex_mem` is active (`dbus_completed` / `sbus_completed`). This prevents the AHB bridge from re-issuing the same store when EX/MEM is held for IBUS stall or other front-end stalls (AHB memory-replay fix).
+1. `bus_stall`: freeze the whole pipeline including MEM/WB; **no flush** while active
+2. Taken branch/jump flush
+3. `div_busy`: hold PC, IF/ID, ID/EX; bubble EX/MEM
+4. load-use: hold PC, IF/ID; bubble ID/EX
+5. IBUS not ready: hold PC; bubble IF/ID
 
-Priority in the current combinational hazard logic is:
-
-1. MEM bus stall (full pipeline hold; **no flush** while active)
-2. Taken branch/jump flush (only when not in item 1)
-3. ID/EX load-use bubble
-4. Front-end stall (`ibus_stall`, `load_use`, `div_busy`, etc.)
-   - `stall_id_ex` is always asserted in item 4
-   - If the pending DBUS/SBUS beat is not done: hold EX/MEM
-   - Else if completed beat is a load: allow EX/MEM to advance into MEM/WB so load-use consumers can release
-   - Else if completed beat is a store during `ibus_stall`: bubble EX/MEM after `rv32im_core` masks valid to avoid replay
-   - Else if `ibus_stall`: hold EX/MEM
-   - Else: bubble EX/MEM for a completed beat while the front end is stalled
+Only item 1 stops MEM/WB, so the back end always drains and EX never waits on a producer that retires underneath it.
 
 `rv32im_core` complements the hazard unit:
 
 - IF/ID and ID/EX flush only when `flush && !stall_if_id` / `flush && !stall_id_ex`
-- MEM/WB captures EX/MEM only when `!stall_ex_mem && !bubble_ex_mem` (no writeback on bubble cycles)
+- MEM/WB captures EX/MEM whenever `!stall_mem_wb`
 
 Directed bus-overlap tests (require testbench plusargs in `tests/core/asm/*.plusargs`):
 
@@ -285,7 +285,7 @@ The core also includes a WB-to-ID register read bypass in `rv32im_core`. This mo
 
 ### 9.1 TORV SoC simulation top
 
-`torv_soc_top` wraps `rv32im_ahb_top` (three `rv32im_ahb_bridge` masters) plus `torv_ahb_sram` for IMEM/DBUS/SBUS SRAM and the APB UART peripheral window.
+`torv_soc_top` wraps `rv32im_ahb_top` (pipelined masters: `rv32im_ahb_fetch` for IBUS, two `rv32im_ahb_dport` for DBUS/SBUS) plus `torv_ahb_sram` for IMEM/DBUS/SBUS SRAM and the APB UART peripheral window. The SBUS HRDATA/HREADY mux and APB PSEL use the data-phase slave select `s_periph_dph`.
 
 Peripheral window `0x4000_1000`–`0x4000_1FFF` uses third-party IP only (see `ip/README.md`):
 

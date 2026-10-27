@@ -34,9 +34,10 @@ module tb_torv_soc;
   logic [7:0] ibus_stall_cnt;
   logic       ibus_stall_armed;
   logic       ibus_stall_done;
+  // Load/store in MEM with its AHB data phase in progress.
   wire        mem_bus_active =
       (dut.u_cpu.u_core.ex_mem_mem_write || dut.u_cpu.u_core.ex_mem_mem_read) &&
-      (dut.u_cpu.u_core.sbus_valid || dut.u_cpu.u_core.dbus_valid);
+      (dut.u_cpu.u_core.sbus_dph || dut.u_cpu.u_core.dbus_dph);
 
   // +stall_sbus_writes=N (SBUS SRAM path only, not APB UART)
   int stall_sbus_len;
@@ -165,10 +166,13 @@ module tb_torv_soc;
     end else begin
       cycle_count <= cycle_count + 1;
 
-      s_data_valid_q <= (dut.s_htrans != HTRANS_IDLE);
-      if (dut.s_htrans != HTRANS_IDLE) begin
-        s_write_q <= dut.s_hwrite;
-        s_addr_q  <= dut.s_haddr;
+      // AHB monitor: phases advance only when HREADY is high.
+      if (dut.s_hready) begin
+        s_data_valid_q <= (dut.s_htrans != HTRANS_IDLE);
+        if (dut.s_htrans != HTRANS_IDLE) begin
+          s_write_q <= dut.s_hwrite;
+          s_addr_q  <= dut.s_haddr;
+        end
       end
 
       if (dut.u_cpu.u_core.stall_if_id)  stall_if_count <= stall_if_count + 1;
@@ -214,7 +218,7 @@ module tb_torv_soc;
       if (dut.u_cpu.u_core.ex_branch_taken)
         branch_taken_count <= branch_taken_count + 1;
 
-      if (s_data_valid_q && s_write_q && (s_addr_q == TOHOST_ADDR)) begin
+      if (dut.s_hready && s_data_valid_q && s_write_q && (s_addr_q == TOHOST_ADDR)) begin
         if (dut.s_hwdata[7:0] == 8'h01) begin
           print_perf();
           if (replay_expect > 0 && periph_tx_count_hw != replay_expect) begin

@@ -11,6 +11,7 @@ module torv_ahb_sram #(
   input  logic        hwrite,
   input  logic [2:0]  hsize,
   input  logic [31:0] hwdata,
+  input  logic        hready_in, // bus HREADY: address/data phases advance only when high
   output logic [31:0] hrdata,
   output logic        hready,
   output logic        hresp
@@ -54,7 +55,7 @@ module torv_ahb_sram #(
       write_q      <= 1'b0;
       size_q       <= 3'b010;
       addr_q       <= 32'd0;
-    end else begin
+    end else if (hready_in) begin
       data_valid_q <= (htrans != HTRANS_IDLE);
       if (htrans != HTRANS_IDLE) begin
         write_q <= hwrite;

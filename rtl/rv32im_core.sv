@@ -9,13 +9,15 @@
 module rv32im_core (
   input  logic        clk,
   input  logic        rst_n,
-  output logic        ibus_valid,
   input  logic        ibus_ready,
   output logic [31:0] ibus_addr,
   output logic [31:0] ibus_next_addr,
   input  logic [31:0] ibus_rdata,
+  // DBUS/SBUS: valid/addr/we/be are the address phase (EX), wdata/rdata the
+  // data phase (MEM); ready is the bus HREADY, dph flags an active data phase.
   output logic        dbus_valid,
   input  logic        dbus_ready,
+  input  logic        dbus_dph,
   output logic [31:0] dbus_addr,
   output logic        dbus_we,
   output logic [3:0]  dbus_be,
@@ -23,6 +25,7 @@ module rv32im_core (
   input  logic [31:0] dbus_rdata,
   output logic        sbus_valid,
   input  logic        sbus_ready,
+  input  logic        sbus_dph,
   output logic [31:0] sbus_addr,
   output logic        sbus_we,
   output logic [3:0]  sbus_be,
@@ -36,8 +39,10 @@ module rv32im_core (
   logic [31:0] pc_plus4;
   logic        stall_pc_h;
   logic        stall_if_id;
+  logic        bubble_if_id;
   logic        stall_id_ex;
   logic        stall_ex_mem;
+  logic        stall_mem_wb;
   logic        bubble_ex_mem;
   logic        bubble_id_ex;
   logic        flush;
@@ -66,7 +71,8 @@ module rv32im_core (
       if_id_inst  <= NOP_INSTR;
       if_id_pc_p4 <= 32'd4;
     // Honor stall_if_id before flush: clearing IF/ID during a stall loses state.
-    end else if (flush && !stall_if_id) begin
+    // bubble_if_id: no instruction fetched this cycle (IBUS not ready).
+    end else if ((flush || bubble_if_id) && !stall_if_id) begin
       if_id_pc    <= 32'd0;
       if_id_inst  <= NOP_INSTR;
       if_id_pc_p4 <= 32'd0;
@@ -77,7 +83,6 @@ module rv32im_core (
     end
   end
 
-  assign ibus_valid = 1'b1;
   assign ibus_addr  = pc;
   // PC of the next cycle; the pipelined fetch issues it as the AHB address phase.
   assign ibus_next_addr = stall_pc_h ? pc : pc_next;
@@ -405,46 +410,48 @@ module rv32im_core (
   assign ex_branch_target = id_ex_is_jalr ? ((fa_val + id_ex_imm) & 32'hFFFF_FFFE) :
                                             (id_ex_pc + id_ex_imm);
 
-  logic dbus_valid_w;
-  logic sbus_valid_w;
-  logic dbus_valid_r;
-  logic sbus_valid_r;
-  logic dbus_completed;
-  logic sbus_completed;
+  // Load/store address phase is issued from EX; the data phase follows in MEM.
+  logic        use_sbus_ex;
+  logic        dbus_req_ex;
+  logic        sbus_req_ex;
+  logic [31:0] store_wdata_ex;
 
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      dbus_valid_r <= 1'b0;
-      sbus_valid_r <= 1'b0;
-    end else begin
-      dbus_valid_r <= dbus_valid_w;
-      sbus_valid_r <= sbus_valid_w;
-    end
-  end
+  addr_decode u_ad (
+    .addr(alu_y),
+    .use_sbus(use_sbus_ex)
+  );
 
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      dbus_completed <= 1'b0;
-      sbus_completed <= 1'b0;
-    end else if (!stall_ex_mem) begin
-      if (!ex_mem_mem_write)
-        dbus_completed <= 1'b0;
-      if (!ex_mem_mem_read && !ex_mem_mem_write)
-        sbus_completed <= 1'b0;
-    end else begin
-      if (dbus_valid_w && dbus_ready && ex_mem_mem_write)
-        dbus_completed <= 1'b1;
-      // SBUS: guard loads and stores (UART RBR pop / THR push) — BYG-005.
-      if (sbus_valid_w && sbus_ready && (ex_mem_mem_write || ex_mem_mem_read))
-        sbus_completed <= 1'b1;
-    end
-  end
+  lsu u_lsu (
+    .mem_read(id_ex_mem_read),
+    .mem_write(id_ex_mem_write),
+    .addr(alu_y),
+    .wdata(fb_val),
+    .funct3(id_ex_funct3),
+    .use_sbus(use_sbus_ex),
+    .dbus_valid(dbus_req_ex),
+    .dbus_we(dbus_we),
+    .dbus_be(dbus_be),
+    .dbus_addr(dbus_addr),
+    .dbus_wdata(store_wdata_ex),
+    .sbus_valid(sbus_req_ex),
+    .sbus_we(sbus_we),
+    .sbus_be(sbus_be),
+    .sbus_addr(sbus_addr),
+    .sbus_wdata()
+  );
 
-  // Keep req_valid asserted until the bridge returns req_ready. Once a store has
-  // completed while EX/MEM is held, drop valid so AHB/APB side effects (UART THR)
-  // are not replayed on the next bridge IDLE cycle.
-  assign dbus_valid = dbus_valid_w && !dbus_completed;
-  assign sbus_valid = sbus_valid_w && !sbus_completed;
+  // A request is only presented while the other data bus is ready, and any
+  // load/store in EX stalls while either bus is not ready. The request can then
+  // never be accepted on a cycle where EX is held (no repeated access), and
+  // bus_stall does not depend on the EX address decode (timing: it fans out to
+  // every pipeline register enable).
+  logic ex_mem_op;
+  logic bus_stall;
+  assign ex_mem_op  = id_ex_mem_read || id_ex_mem_write;
+  assign dbus_valid = dbus_req_ex && sbus_ready;
+  assign sbus_valid = sbus_req_ex && dbus_ready;
+  assign bus_stall  = (dbus_dph && !dbus_ready) || (sbus_dph && !sbus_ready) ||
+                      (ex_mem_op && !(dbus_ready && sbus_ready));
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -457,6 +464,7 @@ module rv32im_core (
       ex_mem_store_data <= 32'd0;
       ex_mem_pc_p4      <= 32'd0;
       ex_mem_funct3     <= 3'd0;
+      use_sbus_exmem    <= 1'b0;
     end else if (!stall_ex_mem) begin
       if (bubble_ex_mem) begin
         ex_mem_reg_write  <= 1'b0;
@@ -468,6 +476,7 @@ module rv32im_core (
         ex_mem_store_data <= 32'd0;
         ex_mem_pc_p4      <= 32'd0;
         ex_mem_funct3     <= 3'd0;
+        use_sbus_exmem    <= 1'b0;
       end else begin
         ex_mem_reg_write  <= id_ex_reg_write;
         ex_mem_mem_read   <= id_ex_mem_read;
@@ -475,60 +484,35 @@ module rv32im_core (
         ex_mem_wb_sel     <= id_ex_wb_sel;
         ex_mem_rd         <= id_ex_rd;
         ex_mem_alu        <= ex_alu_res;
-        ex_mem_store_data <= id_ex_mem_write ? fb_val : 32'd0;
+        ex_mem_store_data <= store_wdata_ex;
         ex_mem_pc_p4      <= id_ex_pc_p4;
         ex_mem_funct3     <= id_ex_funct3;
+        use_sbus_exmem    <= use_sbus_ex;
       end
     end
   end
 
-  addr_decode u_ad (
-    .addr(ex_mem_alu),
-    .use_sbus(use_sbus_exmem)
-  );
-
-  lsu u_lsu (
-    .mem_read(ex_mem_mem_read),
-    .mem_write(ex_mem_mem_write),
-    .addr(ex_mem_alu),
-    .wdata(ex_mem_store_data),
-    .funct3(ex_mem_funct3),
-    .use_sbus(use_sbus_exmem),
-    .dbus_valid(dbus_valid_w),
-    .dbus_we(dbus_we),
-    .dbus_be(dbus_be),
-    .dbus_addr(dbus_addr),
-    .dbus_wdata(dbus_wdata),
-    .sbus_valid(sbus_valid_w),
-    .sbus_we(sbus_we),
-    .sbus_be(sbus_be),
-    .sbus_addr(sbus_addr),
-    .sbus_wdata(sbus_wdata)
-  );
+  // Data phase: byte-lane aligned store data from EX/MEM.
+  assign dbus_wdata = ex_mem_store_data;
+  assign sbus_wdata = ex_mem_store_data;
 
   hazard_unit u_hz (
     .id_ex_mem_read(id_ex_mem_read),
     .id_ex_rd(id_ex_rd),
     .if_id_inst(if_id_inst),
-    .ex_mem_mem_read(ex_mem_mem_read),
-    .ex_mem_mem_write(ex_mem_mem_write),
     .ex_branch_taken(ex_branch_taken),
-    .ibus_valid(ibus_valid),
     .ibus_ready(ibus_ready),
-    .dbus_valid(dbus_valid_w),
-    .dbus_valid_stall(dbus_valid_r),
-    .dbus_ready(dbus_ready),
-    .sbus_valid(sbus_valid_w),
-    .sbus_valid_stall(sbus_valid_r),
-    .sbus_ready(sbus_ready),
+    .bus_stall(bus_stall),
     .div_busy(md_stall),
     .flush(flush),
     .stall_pc(stall_pc_h),
     .stall_if_id(stall_if_id),
+    .bubble_if_id(bubble_if_id),
     .stall_id_ex(stall_id_ex),
+    .bubble_id_ex(bubble_id_ex),
     .stall_ex_mem(stall_ex_mem),
     .bubble_ex_mem(bubble_ex_mem),
-    .bubble_id_ex(bubble_id_ex)
+    .stall_mem_wb(stall_mem_wb)
   );
 
   function automatic logic [31:0] load_extend(
@@ -564,9 +548,9 @@ module rv32im_core (
       mem_wb_mem       <= 32'd0;
       mem_wb_wb_sel    <= 2'b00;
       mem_wb_pc_p4     <= 32'd0;
-    // Do not retire EX/MEM on a bubble cycle: ex_mem is cleared in the same
-    // edge, but the pre-bubble value would otherwise be written again (Bug2).
-    end else if (!stall_ex_mem && !bubble_ex_mem) begin
+    // MEM always retires unless a bus wait state freezes the pipeline; the load
+    // data phase completes in this same cycle.
+    end else if (!stall_mem_wb) begin
       mem_wb_reg_write <= ex_mem_reg_write;
       mem_wb_rd        <= ex_mem_rd;
       mem_wb_alu       <= ex_mem_alu;

@@ -13,11 +13,10 @@
 //   0x4000_1000 .. 0x4000_1FFF  APB UART (periph asm tests)
 //   0xF000_0000                 tohost (monitored by tb_torv_soc, not decoded here)
 //
-// AHB note: s_periph_sel and s_bridge_hsel use the current address phase. This matches
-// the single-beat rv32im_ahb_bridge master (HADDR held until HREADY). For pipelined
-// DMA or strict AMBA compliance, register the peripheral select on HREADY and mux
-// data-phase HRDATA/HREADY from the latched decode; keep HSEL address-only (not gated
-// by HTRANS_IDLE) per ARM AMBA guidance.
+// AHB note: the CPU masters are pipelined (address phase of the next transfer overlaps
+// the data phase of the current one). s_bridge_hsel decodes the address phase; the
+// SBUS HRDATA/HREADY mux and APB PSEL use s_periph_dph, the decode registered when
+// the address phase is accepted (HREADY high).
 `timescale 1ns / 1ps
 
 module torv_soc_top #(
@@ -121,6 +120,7 @@ module torv_soc_top #(
     .hwrite(i_hwrite),
     .hsize(i_hsize),
     .hwdata(i_hwdata),
+    .hready_in(i_hready),
     .hrdata(i_hrdata),
     .hready(i_sram_hready),
     .hresp(i_hresp)
@@ -134,6 +134,7 @@ module torv_soc_top #(
     .hwrite(d_hwrite),
     .hsize(d_hsize),
     .hwdata(d_hwdata),
+    .hready_in(d_hready),
     .hrdata(d_hrdata),
     .hready(d_hready),
     .hresp(d_hresp)
@@ -161,6 +162,7 @@ module torv_soc_top #(
     .hwrite(s_hwrite),
     .hsize(s_hsize),
     .hwdata(s_hwdata),
+    .hready_in(s_hready),
     .hrdata(s_sram_hrdata),
     .hready(s_sram_hready),
     .hresp(s_sram_hresp)
@@ -182,15 +184,24 @@ module torv_soc_top #(
 
   wire s_bridge_hsel = s_periph_sel && (s_htrans != HTRANS_IDLE);
 
+  // Data-phase slave select: which slave owns the current SBUS data phase.
+  logic s_periph_dph;
+  always_ff @(posedge hclk or negedge hresetn) begin
+    if (!hresetn)
+      s_periph_dph <= 1'b0;
+    else if (s_hready)
+      s_periph_dph <= s_bridge_hsel;
+  end
+
   assign uart_rx           = 1'b1;
-  assign s_hready          = s_periph_sel ? s_bridge_hreadyout :
+  assign s_hready          = s_periph_dph ? s_bridge_hreadyout :
                              (s_sram_hready && !sbus_stall_hold);
-  assign s_hrdata          = s_periph_sel ? s_periph_hrdata : s_sram_hrdata;
+  assign s_hrdata          = s_periph_dph ? s_periph_hrdata : s_sram_hrdata;
   assign s_hresp           = 1'b0;
   assign s_periph_hrdata   = s_bridge_hrdata;
   assign s_periph_hresp    = 1'b0;
   assign apb_presetn       = hresetn;
-  assign apb_psel          = s_periph_sel && (apb_penable || !s_bridge_hreadyout);
+  assign apb_psel          = s_periph_dph && (apb_penable || !s_bridge_hreadyout);
 
   assign i_hready = i_sram_hready && !ibus_stall_hold;
 

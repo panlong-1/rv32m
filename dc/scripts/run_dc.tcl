@@ -76,7 +76,7 @@ set rtl_files [list \
   [file join $RTL_ROOT hazard_unit.sv] \
   [file join $RTL_ROOT lsu.sv] \
   [file join $RTL_ROOT rv32im_core.sv] \
-  [file join $RTL_ROOT rv32im_ahb_bridge.sv] \
+  [file join $RTL_ROOT rv32im_ahb_dport.sv] \
   [file join $RTL_ROOT rv32im_ahb_fetch.sv] \
   [file join $RTL_ROOT rv32im_ahb_top.sv] \
 ]
