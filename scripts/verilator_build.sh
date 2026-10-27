@@ -39,6 +39,8 @@ rv32m_resolve_filelist_path() {
   local file="$1"
   file="${file//\$\{RV32M_ROOT\}/$RV32M_ROOT}"
   file="${file//\$RV32M_ROOT/$RV32M_ROOT}"
+  file="${file//\$\{PDK_ROOT\}/${PDK_ROOT:-$HOME/.ciel}}"
+  file="${file//\$PDK_ROOT/${PDK_ROOT:-$HOME/.ciel}}"
   if [[ "$file" = /* ]]; then
     printf '%s\n' "$file"
   else
@@ -73,6 +75,7 @@ VL_CMD=(
   "$VERILATOR" --binary --timing --trace
   -Wno-fatal
   -Wno-TIMESCALEMOD
+  -DFUNCTIONAL
   -Mdir obj_dir
   -CFLAGS "-std=c++17"
   --top-module "$TOP"

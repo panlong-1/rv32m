@@ -18,7 +18,7 @@ Open-source **RV32I + M-extension** five-stage in-order Harvard core (no CSRs/tr
 
 ## Quick start (Verilator + GTKWave)
 
-Prerequisites: **Verilator**, **RISC-V GNU toolchain** (`riscv32-unknown-elf-gcc` or the prefix you configure), and optionally **GTKWave**.
+Prerequisites: **Verilator**, **RISC-V GNU toolchain** (`riscv32-unknown-elf-gcc` or the prefix you configure), the **IHP SG13G2 PDK** (SoC SRAMs are `RM_IHPSG13_1P_*` macros; simulation uses their functional models from `$PDK_ROOT/ihp-sg13g2/libs.ref/sg13g2_sram/verilog`, default `PDK_ROOT=~/.ciel`), and optionally **GTKWave**.
 
 1. Clone this repository and load the environment (see [Environment](#environment)).
 2. Run a smoke test:
@@ -64,6 +64,7 @@ Edit the **Site defaults** block at the top of `scripts/open_rv.sh` for your mac
 | `RV32M_RISCV_TOOLCHAIN_BIN` | RISC-V `gcc`/`objdump` directory |
 | `RV32M_RISCV_GNU_PREFIX` | Tool prefix, e.g. `riscv64-unknown-elf-` |
 | `RV32M_VERILATOR` / `RV32M_VERILATOR_BIN_DIR` | Verilator (default sim) |
+| `PDK_ROOT` | IHP SG13G2 PDK root (SRAM macro models; LibreLane), default `~/.ciel` |
 | `RV32M_VCS_HOME` / `RV32M_VERDI_HOME` / `RV32M_DC_HOME` | Optional Synopsys tools |
 | `RV32M_SNPSLMD_LICENSE_FILE` | Synopsys license (if needed) |
 

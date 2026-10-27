@@ -264,18 +264,40 @@ module tb_torv_soc;
     end
   endtask
 
-  task automatic clear_memories;
-    int i;
-    begin
-      for (i = 0; i < 65536; i++) begin
-        dut.u_i_sram.mem[i] = 8'h13;
-        dut.u_d_sram.mem[i] = 8'd0;
-        dut.u_s_sram.mem[i] = 8'd0;
+  // Backdoor into the IHP SRAM macro behavioral models (word arrays).
+`define TORV_IMEM dut.u_i_sram.g_macro.u_macro.i_SRAM_1P_behavioral_bm_bist.memory
+`define TORV_DMEM dut.u_d_sram.g_macro.u_macro.i_SRAM_1P_behavioral_bm_bist.memory
+`define TORV_SMEM dut.u_s_sram.g_macro.u_macro.i_SRAM_1P_behavioral_bm_bist.memory
+
+  localparam int IMG_BYTES = 65536;
+  logic [7:0] img[IMG_BYTES];
+
+  // Fill img with a repeating 32-bit word (little-endian).
+  task automatic img_fill(input logic [31:0] word);
+    for (int i = 0; i < IMG_BYTES; i++)
+      img[i] = word[8 * (i % 4) +: 8];
+  endtask
+
+  // Load a byte-addressed objcopy verilog hex; fail if it does not fit.
+  task automatic img_load(input string path, input logic [31:0] fill, input int words);
+    img_fill(fill);
+    $readmemh(path, img);
+    for (int i = words * 4; i < IMG_BYTES; i++) begin
+      if (img[i] !== fill[8 * (i % 4) +: 8]) begin
+        $error("%s does not fit in %0d-word SRAM (byte 0x%0h)", path, words, i);
+        $finish(1);
       end
-      for (i = 1; i < 65536; i += 4) dut.u_i_sram.mem[i] = 8'h00;
-      for (i = 2; i < 65536; i += 4) dut.u_i_sram.mem[i] = 8'h00;
-      for (i = 3; i < 65536; i += 4) dut.u_i_sram.mem[i] = 8'h00;
     end
+  endtask
+
+  function automatic logic [31:0] img_word(input int w);
+    img_word = {img[4 * w + 3], img[4 * w + 2], img[4 * w + 1], img[4 * w]};
+  endfunction
+
+  task automatic clear_memories;
+    for (int w = 0; w < dut.IMEM_WORDS; w++)  `TORV_IMEM[w] = 32'h0000_0013;
+    for (int w = 0; w < dut.DMEM_WORDS; w++)  `TORV_DMEM[w] = 32'd0;
+    for (int w = 0; w < dut.SBMEM_WORDS; w++) `TORV_SMEM[w] = 32'd0;
   endtask
 
   initial begin
@@ -295,9 +317,12 @@ module tb_torv_soc;
     void'($value$plusargs("max_cycles=%d", max_cycles));
     void'($value$plusargs("replay_expect=%d", replay_expect));
     void'($value$plusargs("replay_expect_rbr=%d", replay_expect_rbr));
-    $readmemh(imem_hex, dut.u_i_sram.mem);
-    if ($value$plusargs("dmem=%s", dmem_hex))
-      $readmemh(dmem_hex, dut.u_d_sram.mem);
+    img_load(imem_hex, 32'h0000_0013, dut.IMEM_WORDS);
+    for (int w = 0; w < dut.IMEM_WORDS; w++) `TORV_IMEM[w] = img_word(w);
+    if ($value$plusargs("dmem=%s", dmem_hex)) begin
+      img_load(dmem_hex, 32'd0, dut.DMEM_WORDS);
+      for (int w = 0; w < dut.DMEM_WORDS; w++) `TORV_DMEM[w] = img_word(w);
+    end
 
     hresetn = 1'b0;
     repeat (6) @(posedge hclk);

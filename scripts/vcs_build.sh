@@ -21,6 +21,8 @@ rv32m_resolve_filelist_path() {
   local file="$1"
   file="${file//\$\{RV32M_ROOT\}/$RV32M_ROOT}"
   file="${file//\$RV32M_ROOT/$RV32M_ROOT}"
+  file="${file//\$\{PDK_ROOT\}/${PDK_ROOT:-$HOME/.ciel}}"
+  file="${file//\$PDK_ROOT/${PDK_ROOT:-$HOME/.ciel}}"
   if [[ "$file" = /* ]]; then
     printf '%s\n' "$file"
   else
@@ -57,6 +59,7 @@ fi
 CMD=(
   "$VCS" -full64 -sverilog
   -timescale=1ns/1ps
+  +define+FUNCTIONAL
   +incdir+"$ROOT/rtl"
   +incdir+"$ROOT/ip/third_party/socbus/include"
 )

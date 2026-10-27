@@ -14,5 +14,10 @@ $RV32M_ROOT/rtl/rv32im_core.sv
 $RV32M_ROOT/rtl/rv32im_ahb_dport.sv
 $RV32M_ROOT/rtl/rv32im_ahb_fetch.sv
 $RV32M_ROOT/rtl/rv32im_ahb_top.sv
+# IHP SG13G2 SRAM macro models (PDK, functional view)
+${PDK_ROOT}/ihp-sg13g2/libs.ref/sg13g2_sram/verilog/RM_IHPSG13_1P_core_behavioral_bm_bist.v
+${PDK_ROOT}/ihp-sg13g2/libs.ref/sg13g2_sram/verilog/RM_IHPSG13_1P_256x32_c2_bm_bist.v
+${PDK_ROOT}/ihp-sg13g2/libs.ref/sg13g2_sram/verilog/RM_IHPSG13_1P_512x32_c2_bm_bist.v
+${PDK_ROOT}/ihp-sg13g2/libs.ref/sg13g2_sram/verilog/RM_IHPSG13_1P_1024x32_c2_bm_bist.v
 $RV32M_ROOT/rtl/torv_ahb_sram.sv
 $RV32M_ROOT/rtl/torv_soc_top.sv

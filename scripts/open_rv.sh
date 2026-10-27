@@ -56,6 +56,9 @@ fi
 : "${RV32M_DC_HOME:=/opt/synopsys/syn/R-2020.09-SP4}"
 # : "${RV32M_SNPSLMD_LICENSE_FILE:=27000@your-license-server}"
 
+# --- IHP SG13G2 PDK (SRAM macro models for simulation; LibreLane PDK_ROOT) ---
+: "${PDK_ROOT:=${HOME}/.ciel}"
+
 # --- Design Compiler PDK (optional) ---
 : "${TSMC013_TARGET_LIB:=${HOME}/PDK/TSMC_013/synopsys/slow.db}"
 
@@ -76,6 +79,7 @@ fi
 # ---------------------------------------------------------------------------
 export RV32M_RISCV_TOOLCHAIN_BIN="${RV32M_RISCV_TOOLCHAIN_BIN:-${PROJECT_ROOT}/riscv_toolchain/bin}"
 export RV32M_RISCV_GNU_PREFIX="${RV32M_RISCV_GNU_PREFIX:-riscv64-unknown-elf-}"
+export PDK_ROOT
 
 export RV32M_VERILATOR="${RV32M_VERILATOR:-verilator}"
 export RV32M_VERILATOR_BIN_DIR="${RV32M_VERILATOR_BIN_DIR:-}"
@@ -146,4 +150,9 @@ echo "  RV32M_VERILATOR=$RV32M_VERILATOR ($(command -v "$RV32M_VERILATOR" 2>/dev
 echo "  RV32M_VCS_HOME=${RV32M_VCS_HOME:-<unset>} (vcs: $(command -v vcs 2>/dev/null || echo missing))"
 echo "  RV32M_VERDI_HOME=${RV32M_VERDI_HOME:-<unset>} (verdi: $(command -v verdi 2>/dev/null || echo missing))"
 echo "  RV32M_DC_HOME=${RV32M_DC_HOME:-<unset>}"
+if [[ -d "$PDK_ROOT/ihp-sg13g2/libs.ref/sg13g2_sram/verilog" ]]; then
+  echo "  PDK_ROOT=$PDK_ROOT (IHP SRAM models: ok)"
+else
+  echo "  PDK_ROOT=$PDK_ROOT (IHP SRAM models: MISSING — install ihp-sg13g2 or set PDK_ROOT)"
+fi
 echo "  After run_case.sh:  t  -> cd to last case build dir"
