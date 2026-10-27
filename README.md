@@ -153,6 +153,22 @@ make -C dc
 # or: ./scripts/dc_build.sh
 ```
 
+### 6. Synthesis on IHP SG13G2 (LibreLane, open source)
+
+Same top (`rv32im_ahb_top`), RTL set and constraints as the DC flow, mapped to the IHP SG13G2 130 nm standard cells with Yosys, followed by OpenROAD pre-PnR STA on the slow/typ/fast corners. Runs inside the LibreLane 3.0.16 Docker image.
+
+Requires a LibreLane venv (default `~/.venv/librelane`), the `ihp-sg13g2` PDK under `PDK_ROOT` (default `~/.ciel`), and Docker usable without sudo. The repo must live under `$HOME` so the container can see it.
+
+```bash
+make -C librelane                              # or: ./scripts/ihp_synth.sh
+make -C librelane CLOCK_PERIOD=10 TAG=p10      # other clock target, separate run dir
+make -C librelane qor TAG=p10                  # re-print QoR of a run
+```
+
+Config: `librelane/config.yaml`, SDC: `librelane/constraints.sdc` (clock period comes from `CLOCK_PERIOD`, default 5 ns). Outputs under `librelane/runs/<tag>/`: netlist `final/nl/rv32im_ahb_top.nl.v`, cell report `06-yosys-synthesis/reports/stat.rpt`, timing `12-openroad-staprepnr/<corner>/max.rpt`.
+
+Pre-PnR timing has no placement or resizing, so treat it as an estimate.
+
 ### Quick reference (copy-paste)
 
 ```bash

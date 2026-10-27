@@ -30,6 +30,9 @@ dc/command.log
 dc/filenames.log
 dc/default.svf
 
+# LibreLane (IHP SG13G2) run directories
+librelane/runs/
+
 # Tool and editor scratch notes
 codex_txt
 cursor_txt
