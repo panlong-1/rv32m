@@ -415,16 +415,22 @@ module rv32im_core (
   logic        dbus_req_ex;
   logic        sbus_req_ex;
   logic [31:0] store_wdata_ex;
+  logic [31:0] mem_addr_ex;
+
+  // Dedicated AGU: loads/stores are always rs1 + imm, so the bus address does
+  // not wait for the ALU control decode and operation mux (slow-corner timing:
+  // this adder drives the AHB address-phase outputs).
+  assign mem_addr_ex = fa_val + id_ex_imm;
 
   addr_decode u_ad (
-    .addr(alu_y),
+    .addr(mem_addr_ex),
     .use_sbus(use_sbus_ex)
   );
 
   lsu u_lsu (
     .mem_read(id_ex_mem_read),
     .mem_write(id_ex_mem_write),
-    .addr(alu_y),
+    .addr(mem_addr_ex),
     .wdata(fb_val),
     .funct3(id_ex_funct3),
     .use_sbus(use_sbus_ex),

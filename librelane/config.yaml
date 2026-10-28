@@ -31,6 +31,12 @@ USE_SLANG: true
 # Buffer high-fanout nets in ABC; without it pre-PnR STA is dominated by
 # unbuffered fanout (WNS -21.6 ns vs -4.4 ns at 5 ns, slow corner) for +3.6% area
 SYNTH_ABC_BUFFERING: true
+# Booth-encoded multiplier: -8.4% cell area and a shorter MUL path than the
+# default array (pre-PnR, 7 ns, slow corner)
+SYNTH_MUL_BOOTH: true
+# Repair setup/hold again with global-route parasitics; post-CTS repair alone
+# left ~1 ns of routing-induced degradation on the slow corner
+RUN_POST_GRT_RESIZER_TIMING: true
 
 CLOCK_PORT: hclk
 CLOCK_PERIOD: 5.0

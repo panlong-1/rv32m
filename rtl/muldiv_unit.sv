@@ -1,5 +1,5 @@
 // RV32M multiply/divide (spec §3 EX, §9.1)
-// MUL* uses one shared combinational 33x33 multiplier. DIV/REM uses an
+// MUL* uses one shared 33x33 multiplier over two cycles. DIV/REM uses an
 // iterative restoring divider to avoid synthesizing a large combinational / %.
 module muldiv_unit (
   input  logic        clk,
@@ -43,17 +43,32 @@ module muldiv_unit (
       end
     endcase
   end
-  assign mul_p = mul_a * mul_b;
+  // MUL* takes two cycles: the first registers the extended operands, the
+  // second multiplies from those registers. This keeps the forwarding muxes
+  // and the multiplier out of one register-to-register path.
+  logic               mul_pend_r;
+  logic signed [32:0] mul_a_r;
+  logic signed [32:0] mul_b_r;
+  logic               mul_hi_r;
 
-  always_comb begin
-    unique case (op)
-      3'b000: mul_result = mul_p[31:0];
-      3'b001,
-      3'b010,
-      3'b011: mul_result = mul_p[63:32];
-      default: mul_result = 32'd0;
-    endcase
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      mul_pend_r <= 1'b0;
+      mul_a_r    <= 33'd0;
+      mul_b_r    <= 33'd0;
+      mul_hi_r   <= 1'b0;
+    end else if (flush || mul_pend_r) begin
+      mul_pend_r <= 1'b0;
+    end else if (valid && !is_divrem) begin
+      mul_pend_r <= 1'b1;
+      mul_a_r    <= mul_a;
+      mul_b_r    <= mul_b;
+      mul_hi_r   <= (op != 3'b000);
+    end
   end
+
+  assign mul_p      = mul_a_r * mul_b_r;
+  assign mul_result = mul_hi_r ? mul_p[63:32] : mul_p[31:0];
 
   logic        active_r;
   logic        ready_r;
@@ -177,7 +192,7 @@ module muldiv_unit (
     end
   end
 
-  assign ready  = valid && !is_divrem ? 1'b1 : ready_r;
+  assign ready  = valid && !is_divrem ? mul_pend_r : ready_r;
   assign busy   = active_r || (valid && is_divrem && !ready_r);
   assign result = (valid && !is_divrem) ? mul_result : result_r;
 endmodule
