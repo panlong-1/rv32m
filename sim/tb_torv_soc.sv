@@ -365,15 +365,6 @@ module tb_torv_soc;
       $dumpfile(vcd_path);
       $dumpvars(0, tb_torv_soc);
     end
-`ifdef RV32M_FSDB
-    if ($test$plusargs("fsdb")) begin
-      string fsdb_path;
-      if (!$value$plusargs("fsdbfile=%s", fsdb_path))
-        fsdb_path = "tb_torv_soc.fsdb";
-      $fsdbDumpfile(fsdb_path);
-      $fsdbDumpvars(0, tb_torv_soc);
-    end
-`endif
   end
 
   int           pc_trace_fd;

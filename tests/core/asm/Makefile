@@ -10,19 +10,19 @@ RUN_CASE       := $(ROOT)/scripts/run_case.sh
 .DEFAULT_GOAL := help
 
 help:
-	@echo "This Makefile only forwards to scripts/run_case.sh (core target)."
+	@echo "This Makefile only forwards to scripts/run_case.sh (TORV SoC)."
 	@echo "From repo root (recommended):"
 	@echo "  $(RUN_CASE) tests/core/asm/alu.S"
 	@echo "From this directory:"
 	@echo "  make run ASM=alu.S"
 	@echo "  make run alu.S     # may print a harmless extra-goal line from GNU make"
-	@echo "Outputs:  $(ROOT)/build/sim/core/<stem>/"
+	@echo "Outputs:  $(ROOT)/build/sim/soc/<stem>/"
 
 list:
 	@ls -1 "$(MAKEFILE_DIR)"*.S 2>/dev/null | xargs -n1 basename | sort || true
 
 clean:
-	rm -rf "$(MAKEFILE_DIR)work" "$(ROOT)/build/sim/core"
+	rm -rf "$(MAKEFILE_DIR)work" "$(ROOT)/build/sim/soc"
 
 run:
 	@asm="$(ASM)"; \

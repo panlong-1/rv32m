@@ -1,6 +1,6 @@
 # RV32IM 5-Stage Pipelined CPU Current Implementation Specification
 
-This document is the Markdown specification for the RTL currently present under `open_rv32m/rtl`. It replaces the older docx architecture description as the working implementation reference. The original docx described a broader target architecture; this file records what is implemented now, what has been verified, and what remains provisional.
+This document is the specification for the RTL currently in `rtl/`. It records what is implemented now, what has been verified, and what remains provisional. It reflects tag `v0.7-open-flow`.
 
 ## 1. Scope
 
@@ -8,13 +8,17 @@ The current core is a 32-bit in-order RISC-V core with a classic five-stage pipe
 
 - IF: instruction fetch through `IBUS`
 - ID: decode, register read, immediate generation, hazard decision
-- EX: ALU, branch target/condition, JAL/JALR target, RV32M result generation
-- MEM: load/store routing through `DBUS` or `SBUS`
-- WB: ALU/load/PC+4 writeback to the integer register file
+- EX: ALU, AGU, branch target/condition, JAL/JALR target, RV32M result generation, AHB address phase for loads/stores
+- MEM: AHB data phase for loads/stores (`DBUS` or `SBUS`), load data extension
+- WB: writeback of the pre-selected result to the integer register file
 
-The top-level module is `rv32im_core`.
+Module hierarchy:
 
-The implementation is intended for simulation and early synthesis exploration. It is not yet a production-ready ASIC microarchitecture.
+- `rv32im_core` — the pipeline, with valid/ready-style IBUS/DBUS/SBUS ports (§3).
+- `rv32im_ahb_top` — `rv32im_core` plus three pipelined AHB-Lite masters: `rv32im_ahb_fetch` (IBUS) and two `rv32im_ahb_dport` (DBUS, SBUS). This is the block implemented with LibreLane (§12).
+- `torv_soc_top` — the TORV SoC: `rv32im_ahb_top`, three `torv_ahb_sram` (IHP SRAM macros), SoCBUS `AHB_APB_BRIDGE` and the PULP UART (§9.1).
+
+The implementation is verified in simulation and taken through an open-source RTL-to-GDS flow on IHP SG13G2. It is not yet a production-ready ASIC microarchitecture (no traps, CSRs or bus error handling).
 
 ## 2. Implemented ISA Subset
 
@@ -56,48 +60,35 @@ RISC-V divide corner cases are implemented:
   - `DIV` returns `32'h8000_0000`
   - `REM` returns `0`
 
-Current implementation note: `muldiv_unit` uses one shared combinational 33x33 multiplier for `MUL*`. `DIV/REM` use a multi-cycle restoring divider. `busy` stalls the pipeline while the divider iterates, and `ready` releases the result for EX/MEM capture.
+Current implementation note: `muldiv_unit` computes `MUL*` in two EX cycles with one shared 33x33 multiplier (operand registers, then multiply). `DIV/REM` use a multi-cycle restoring divider. The hazard unit holds the front end while either is not `ready` (§7.2, §9).
 
-## 3. Top-Level Interface
+## 3. Core Interface (`rv32im_core`)
 
-`rv32im_core` has three Harvard-style external buses.
+`rv32im_core` has three Harvard-style buses. `rv32im_ahb_top` turns each one into an AHB-Lite master. On the data buses, the address-phase signals come from EX and the data-phase signals belong to MEM.
 
 ### 3.1 IBUS
 
 IBUS is used only for instruction fetch.
 
-- `ibus_valid`: always asserted in the current implementation
-- `ibus_ready`: stalls PC and front-end when low
-- `ibus_addr`: current PC
-- `ibus_rdata`: fetched instruction word
+- `ibus_next_addr`: PC of the next cycle (`stall_pc ? pc : pc_next`). `rv32im_ahb_fetch` issues it as the AHB address phase, with `HTRANS = NONSEQ` whenever `HREADY` is high.
+- `ibus_addr`: current PC. Its data phase is the current cycle.
+- `ibus_ready`: the fetched word for `ibus_addr` is valid. It is HREADY, no error, and a data-phase address that matches the PC. When low, the PC holds and IF/ID gets a bubble.
+- `ibus_rdata`: fetched instruction word (HRDATA).
 
-Instruction fetch is little-endian in the simulation memory model.
+One instruction is fetched per cycle from a zero-wait slave.
 
-### 3.2 DBUS
+### 3.2 DBUS / SBUS
 
-DBUS is used for ordinary data memory accesses.
+DBUS carries ordinary data memory accesses. SBUS carries the SoC system/MMIO window and `tohost` (§4). The two ports have the same signals:
 
-- `dbus_valid`: asserted for load/store when `addr_decode` selects DBUS
-- `dbus_ready`: stalls the pipeline when a DBUS transaction is pending and not ready
-- `dbus_addr`: byte address
-- `dbus_we`: store enable
-- `dbus_be`: byte enables
-- `dbus_wdata`: store data aligned to byte lanes
-- `dbus_rdata`: read data word
+- `*_valid`: address phase (EX). Asserted for a load/store routed to this bus, and only while the other data bus is ready (§9).
+- `*_addr`, `*_we`, `*_be`: address-phase byte address (from the AGU), write enable and byte enables. `rv32im_ahb_dport` converts `be` into `HSIZE`.
+- `*_ready`: bus HREADY. A load/store in EX, or an active data phase with `*_ready` low, freezes the pipeline (`bus_stall`).
+- `*_dph`: from the AHB port; an accepted address phase is now in its data phase.
+- `*_wdata`: data-phase store data, aligned to byte lanes (from `ex_mem_store_data`).
+- `*_rdata`: data-phase read data (HRDATA).
 
-### 3.3 SBUS
-
-SBUS is used for MMIO/system/debug regions.
-
-- `sbus_valid`: asserted for load/store when `addr_decode` selects SBUS
-- `sbus_ready`: stalls the pipeline when an SBUS transaction is pending and not ready
-- `sbus_addr`: byte address
-- `sbus_we`: store enable
-- `sbus_be`: byte enables
-- `sbus_wdata`: store data aligned to byte lanes
-- `sbus_rdata`: read data word
-
-The LSU drives exactly one of `dbus_valid` or `sbus_valid` for an active memory operation.
+The LSU drives at most one of `dbus_valid` or `sbus_valid` for an active memory operation.
 
 ## 4. Address Map
 
@@ -116,8 +107,9 @@ The implementation contains explicit pipeline state:
 
 - IF/ID: `pc`, `inst`, `pc_plus4`
 - ID/EX: PC, PC+4, immediate, rs1/rs2 data, rs1/rs2/rd addresses, funct fields, opcode, control bits
-- EX/MEM: register write, memory controls, writeback select, rd, ALU/MULDIV result, store data, PC+4, load/store `funct3`
-- MEM/WB: register write, rd, ALU result, load result, writeback select, PC+4
+- Forwarding selects `forward_a` / `forward_b` (registered alongside ID/EX, §9)
+- EX/MEM: register write, memory controls, writeback select, rd, ALU/MULDIV result, byte-lane store data, PC+4, load/store `funct3`, `use_sbus_exmem` (which bus the data phase belongs to)
+- MEM/WB: register write, rd, `mem_wb_result` (load data, ALU result or PC+4, selected in MEM)
 
 The inserted bubble instruction is `ADDI x0, x0, 0` (`32'h0000_0013`).
 
@@ -188,7 +180,8 @@ Multiplier:
   - signed x signed for `MUL`/`MULH`
   - signed x unsigned for `MULHSU`
   - unsigned x unsigned for `MULHU`
-- `MUL` remains single-cycle from the pipeline point of view.
+- `MUL*` takes two cycles in EX. In the first cycle the extended operands and the high/low select are registered (`mul_a_r`, `mul_b_r`, `mul_hi_r`). In the second cycle the product is computed from those registers and `ready` is asserted. This keeps the forwarding muxes and the multiplier in different register-to-register paths.
+- LibreLane synthesizes the multiplier with Yosys' Booth pass (`SYNTH_MUL_BOOTH`).
 
 Divider:
 
@@ -216,7 +209,7 @@ Target generation:
 - Branch/JAL: `id_ex_pc + id_ex_imm`
 - JALR: `(rs1 + imm) & 32'hFFFF_FFFE`
 
-Taken branches and jumps flush IF/ID and ID/EX when the pipeline is not stalled on that stage.
+Taken branches and jumps flush IF/ID and ID/EX when the pipeline is not stalled on that stage, so a taken branch or jump costs two cycles. There is no branch prediction (fall-through fetch).
 
 ## 8. Memory Stage
 
@@ -261,7 +254,7 @@ All three buses are pipelined AHB-Lite masters:
 - load-use bubble insertion when ID/EX is a load used by IF/ID
 - bus wait states (`bus_stall`: HREADY low on a bus with an active address or data phase)
 - branch/jump flush (`flush = ex_branch_taken && !bus_stall`)
-- `div_busy` from multi-cycle divide in EX
+- `div_busy` (driven by `md_stall = id_ex_muldiv && !md_ready`): a `MUL*` (first cycle) or `DIV/REM` (all iterations) in EX
 - IBUS not ready (no instruction fetched this cycle)
 
 Priority in the combinational hazard logic is:
@@ -282,14 +275,22 @@ Only item 1 stops MEM/WB, so the back end always drains and EX never waits on a 
 Directed bus-overlap tests (require testbench plusargs in `tests/core/asm/*.plusargs`):
 
 - `hazard_branch_mem_stall.S` — taken branch in EX while SBUS store stalls MEM (`+stall_sbus_writes`)
-- `hazard_ibus_store_dup.S` — IBUS stall during store in MEM (`+stall_ibus_during_mem_write`)
-- `hazard_sbus_replay_smoke.S` — IBUS stall during one TORV UART store at `0x4000_1000`; TB checks `+replay_expect=1`
+- `hazard_ibus_store_dup.S`, `hazard_ibus_insn_dup.S`, `hazard_ibus_load_dup.S` — IBUS stall while a store/ALU op/load is in MEM (`+stall_ibus_during_mem_write`). `scripts/check_hazard_dup_trace.py` checks from the PC/WB trace that no writeback is duplicated.
+- `hazard_sbus_replay_smoke.S` — IBUS stall during one TORV UART store at `0x4000_1000`; the TB checks `+replay_expect=1`
+- `hazard_sbus_rx_replay_smoke.S` — the same for a UART RBR read (`+replay_expect_rbr=1`)
 
 The core also includes a WB-to-ID register read bypass in `rv32im_core`. This models write-first register file behavior for same-cycle writeback/decode dependencies and avoids X propagation when an instruction in ID reads the register being written in WB.
 
 ### 9.1 TORV SoC simulation top
 
 `torv_soc_top` wraps `rv32im_ahb_top` (pipelined masters: `rv32im_ahb_fetch` for IBUS, two `rv32im_ahb_dport` for DBUS/SBUS) plus `torv_ahb_sram` for IMEM/DBUS/SBUS SRAM and the APB UART peripheral window. The SBUS HRDATA/HREADY mux and APB PSEL use the data-phase slave select `s_periph_dph`.
+
+`torv_ahb_sram` is a zero-wait AHB-Lite wrapper around one IHP SG13G2 `RM_IHPSG13_1P_<WORDS>x32_c2_bm_bist` macro (`WORDS` = 256/512/1024; `IMEM_WORDS`/`DMEM_WORDS`/`SBMEM_WORDS` default to 1024 = 4 KiB):
+
+- Read: the accepted address phase (`HSEL && HREADY && NONSEQ`) drives the macro address directly, and the registered `A_DOUT` is the data-phase HRDATA.
+- Write: HWDATA arrives in the data phase. If no read address phase needs the single port that cycle, the wrapper writes directly with a byte mask (`A_BM`). Otherwise it parks the write in a one-entry write buffer and drains it on the next free cycle.
+- A read that hits the buffered write, or a write completing in the same cycle, gets those bytes merged (store-then-load stays coherent). A simulation `$error` flags a buffer overrun.
+- BIST ports are tied off, `A_DLY = 1`. The SBUS SRAM is deselected for the UART page and `0xF000_0000`.
 
 Peripheral window `0x4000_1000`–`0x4000_1FFF` uses third-party IP only (see `ip/README.md`):
 
@@ -311,110 +312,83 @@ The physical storage is `mem[31:1]`; there is no reset initialization for x1 thr
 
 ## 11. Verification Status
 
-The current self-checking Verilator/VCS testbench is `sim/tb_torv_soc.sv`.
+The self-checking Verilator testbench is `sim/tb_torv_soc.sv`, around `torv_soc_top`. It provides:
 
-It provides:
+- program/data images loaded into the IHP SRAM macro arrays before reset (`+imem=<hex>`, optional `+dmem=<hex>`). The image goes through a byte buffer, and an image that does not fit is an error.
+- program-controlled pass/fail through a store to `tohost` (`0xF000_0000`), sampled when SBUS HREADY is high
+- bus back-pressure plusargs (`+stall_sbus_writes`, `+stall_ibus_during_mem_write`) and UART replay checks (`+replay_expect`, `+replay_expect_rbr`, `+uart_rx_byte`)
+- `[PERF]` counters (cycles, instructions, IPC, instruction mix, stalls, flushes, bus transfers)
+- optional VCD (`+vcd`), testbench trace (`+trace`) and PC/WB trace TSV (`+pc_trace`)
 
-- byte-addressed instruction memory
-- byte-addressed DBUS memory
-- byte-addressed SBUS memory
-- little-endian instruction/data read model
-- byte-enable-aware DBUS/SBUS writes
-- optional VCD dump with `+vcd`
-- optional trace with `+trace`
-- optional external memory images with `+imem=<file>` and `+dmem=<file>`
-- `TOHOST_ADDR = 32'hF000_0000` for program-controlled pass/fail when using external hex images
+The assembly tests (`tests/core/asm/`, `tests/periph/apb_uart_sv/`) cover:
 
-Built-in self-checks currently cover:
+- every RV32I instruction class, with compare/shift edge cases, `x0`, jumps and flushes
+- RV32M including divide-by-zero and signed overflow, and dependent consumers after MUL/DIV
+- byte/halfword/word loads and stores on DBUS and SBUS, offsets, and interleaved DBUS/SBUS traffic
+- forwarding and load-use, plus directed bus-stall hazard and replay cases (§9)
+- the SRAM wrapper write buffer and read merge (`sram_wbuf.S`)
+- the UART through the AHB→APB bridge
+- performance loops (`perf_alu_chain`, `perf_branch_loop`, `perf_loadstore_loop`, `perf_mul_loop`)
 
-- `ADDI` dependency chain with forwarding/writeback
-- `MUL` result generation
+TORV SoC regression (`regress/cases/soc.list`): **33** cases, all PASS (Verilator 5.020). In simulation only, `u_fwd_chk` cross-checks the registered forwarding selects every cycle.
 
-Toolchain-driven assembly tests currently cover:
+Not covered yet: randomized bus wait states, long C programs (no `crt0`/C runtime yet) and formal checks.
 
-- smoke control-flow and arithmetic (`tests/core/asm/smoke.S`)
-- directed ALU add/sub/logic/compare/shift behavior (`tests/core/asm/alu.S`)
-- RV32M multiply/divide/remainder including corner cases (`tests/core/asm/muldiv.S`)
-- load-use, load-branch, byte/halfword load extension, and load-to-store-data hazards (`tests/core/asm/hazard.S`)
-- branch flush vs MEM bus stall (`tests/core/asm/hazard_branch_mem_stall.S`)
-- IBUS stall vs store / ID/EX freeze (`tests/core/asm/hazard_ibus_store_dup.S`)
-- SBUS replay smoke with non-idempotent peripheral model (`tests/core/asm/hazard_sbus_replay_smoke.S`)
+## 12. Implementation Status (IHP SG13G2, LibreLane)
 
-TORV SoC Verilator regression (`regress/cases/soc.list`): **29** asm cases (core directed/perf plus `tests/periph/apb_uart_sv/*`).
+The open-source flow in `librelane/` implements `rv32im_ahb_top` (core + AHB masters; the SRAM macros and peripherals are outside the block):
 
-Current observed result:
+- LibreLane 3.0.16 Classic flow in Docker: Yosys (slang frontend, ABC buffering, Booth multiplier) → OpenROAD floorplan/placement/CTS/routing with post-CTS and post-global-route timing repair → RC extraction → multi-corner STA → Magic/KLayout DRC, Netgen LVS, antenna check.
+- `make -C librelane` runs synthesis and pre-PnR STA. `make -C librelane flow` runs RTL-to-GDS. See `docs/open_source_flow.md`.
+- Constraints (`librelane/constraints.sdc`): 10 ns clock, 2 ns input/output delay budget, 0.3/0.1 ns setup/hold uncertainty.
 
-```text
-regress/results/20260523_031941/summary.rpt
-PASS 29
-```
+Results at 10 ns (v0.6 RTL):
 
-The tests do not yet cover all supported instruction forms, divide/remainder corner cases, randomized bus wait states, or long C-program execution.
+| Metric | Value |
+|--------|-------|
+| Std-cell area | 266.7k µm² (die 0.508 mm², 56% utilization) |
+| Setup WNS typ / fast | +2.35 ns / +4.12 ns |
+| Setup WNS slow (1.08 V, 125 °C) | −0.73 ns (26 endpoints: 24 register→output, 2 register→register at ≈ −0.07 ns) |
+| Hold | met (all corners) |
+| DRC / LVS / antenna | clean |
 
-## 12. Synthesis Status
+The remaining slow-corner paths start at `ex_mem_wb_sel` (the EX/MEM forwarding source mux, PC+4 vs ALU), pass through the EX operand mux and the branch-target/AGU adders, and end at `i_haddr`, `s/d_htrans` and `s/d_hwrite` under the 2 ns output budget. The architecture issues the AHB address phase from EX, so these paths are inherent. Options are listed in `docs/TODO_LIST.md`.
 
-The Design Compiler flow is under `open_rv32m/dc`.
-
-Files:
-
-- `dc/scripts/run_dc.tcl`
-- `dc/constraints.sdc`
-- `scripts/dc_build.sh`
-- `dc/PDK_setup.txt`
-
-The local TSMC 0.13 µm setup is expected to use:
-
-```bash
-export TSMC013_TARGET_LIB=$HOME/PDK/TSMC_013/synopsys/slow.db
-cd open_rv32m   # or your clone path
-./scripts/dc_build.sh
-```
-
-Current DC status:
-
-- `dc_shell` successfully reads RTL and the TSMC slow library.
-- `compile_ultra` completes after replacing combinational DIV/REM with the iterative divider.
-- `dc/outputs/rv32im_core_mapped.v` is generated.
-- At `slow.db` with a 10 ns clock constraint, reported WNS/TNS are 0.
-- Reported total cell area is approximately `131030.79`.
-
-Most area remains in `regfile` and `muldiv_unit`; further work should decide whether the multiplier should be pipelined, sequential, or mapped to a macro.
+One IHP 1024x32 SRAM macro is 416.6 x 336.5 µm (≈ 140k µm²), so the three default 4 KiB SRAMs are about 1.6x the core area.
 
 ## 13. Current Module List
 
-RTL modules:
+Core and bus masters (`rv32im_ahb_top`):
 
-- `rv32im_core.sv`
-- `pc_unit.sv`
-- `regfile.sv`
-- `decoder.sv`
-- `imm_gen.sv`
-- `alu_control.sv`
-- `alu.sv`
-- `muldiv_unit.sv`
-- `forwarding_unit.sv`
-- `hazard_unit.sv`
-- `addr_decode.sv`
-- `lsu.sv`
-- `bus_if.sv`
+- `rv32im_ahb_top.sv` — core + AHB-Lite masters
+- `rv32im_ahb_fetch.sv` — pipelined IBUS master
+- `rv32im_ahb_dport.sv` — pipelined DBUS/SBUS master
+- `rv32im_core.sv` — pipeline, AGU, forwarding/MEM-WB registers, load extension
+- `pc_unit.sv`, `regfile.sv`, `decoder.sv`, `imm_gen.sv`, `alu_control.sv`, `alu.sv`
+- `muldiv_unit.sv`, `forwarding_unit.sv`, `hazard_unit.sv`, `addr_decode.sv`, `lsu.sv`
+- `bus_if.sv` — typedef-only bus bundle definitions (in `rtl/filelist.f`, not in the LibreLane file list)
 
-`bus_if.sv` currently contains typedef-only bus bundle definitions and is included in the VCS file list. The DC script omits it from analysis because it has no synthesizable module.
+SoC:
+
+- `torv_soc_top.sv` — TORV SoC integration
+- `torv_ahb_sram.sv` — AHB-Lite wrapper for the IHP SRAM macro
+- third-party: SoCBUS `AHB_APB_BRIDGE`, PULP `apb_uart_sv` (`ip/filelist.f`)
+- PDK models: `RM_IHPSG13_1P_*` from `$PDK_ROOT/ihp-sg13g2/libs.ref/sg13g2_sram/verilog`
 
 ## 14. Known Limitations
 
 - No exceptions, interrupts, privilege modes, or CSRs.
 - No trap handling for illegal instructions.
 - No misaligned memory exception handling.
-- No memory protection, cache, MMU, or bus error handling.
-- `ibus_valid` is permanently asserted.
+- No memory protection, cache, MMU, or bus error handling (`HRESP` errors are not reported).
 - Register file nonzero registers are not reset.
-- Built-in simulation tests are still minimal.
-- ASIC synthesis timing/area are first-pass only and still use ideal clocks/no extracted interconnect.
+- No branch prediction (2-cycle taken-branch penalty).
+- The slow-corner timing at 10 ns is not closed (§12). The SRAM macros are not yet part of a placed SoC layout.
 
 ## 15. Recommended Next Steps
 
-1. Add self-checking tests for all implemented RV32I instructions, including `JAL`, `JALR`, `AUIPC`, all branch types, and byte/halfword loads/stores.
-2. Add divide/remainder corner-case tests.
-3. Decide whether RV32M divide/remainder should be multi-cycle RTL, DesignWare, or a macro.
-4. Add a synthesis configuration that can stub DIV/REM for quick top-level timing exploration.
+1. Close the slow corner: pre-select the EX/MEM forwarding value in EX, set the I/O budgets from the real SoC/SRAM timing, or accept 12.5 ns at the slow corner.
+2. Implement `torv_soc_top` with the SRAM macros (macro placement, power) for a full SoC GDS.
+3. Add `crt0`, a C linker script and CoreMark/Dhrystone for published IPC.
+4. Add randomized HREADY back-pressure and SVA on the hazard/replay rules.
 5. Decide whether unsupported instructions remain NOP-like/ignored or gain a trap path in a later milestone.

@@ -10,8 +10,9 @@
 #   3. Site defaults block below (edit paths for your machine)
 #   4. Generic fallbacks ($PROJECT_ROOT/riscv_toolchain/bin, etc.)
 #
-# Downstream scripts still use TOOLCHAIN, PREFIX, VCS_HOME, VERDI_HOME, DC_HOME,
-# VERILATOR — do not rename those exports.
+# Open-source tools only: RISC-V GNU toolchain, Verilator, GTKWave, the IHP
+# SG13G2 PDK (SRAM models) and LibreLane. Downstream scripts use TOOLCHAIN,
+# PREFIX, VERILATOR and PDK_ROOT — do not rename those exports.
 
 if [[ -z "${BASH_VERSION:-}" ]]; then
   echo "open_rv32m: source scripts/open_rv.sh from bash (required for path detection)." >&2
@@ -41,26 +42,25 @@ fi
 # =============================================================================
 
 # --- RISC-V bare-metal GNU toolchain (directory must contain ${PREFIX}gcc) ---
+# Distro package (Ubuntu: gcc-riscv64-unknown-elf) installs into /usr/bin.
+if [[ -z "${RV32M_RISCV_TOOLCHAIN_BIN:-}" && ! -x "${PROJECT_ROOT}/riscv_toolchain/bin/riscv64-unknown-elf-gcc" \
+      && -x /usr/bin/riscv64-unknown-elf-gcc ]]; then
+  RV32M_RISCV_TOOLCHAIN_BIN=/usr/bin
+fi
 : "${RV32M_RISCV_TOOLCHAIN_BIN:=${PROJECT_ROOT}/riscv_toolchain/bin}"
 # : "${RV32M_RISCV_TOOLCHAIN_BIN:=/absolute/path/to/riscv/bin}"
 : "${RV32M_RISCV_GNU_PREFIX:=riscv64-unknown-elf-}"
 
-# --- Verilator / GTKWave (open-source sim & waves) ---
+# --- Verilator / GTKWave (simulation & waves) ---
 : "${RV32M_VERILATOR:=verilator}"
-: "${RV32M_VERILATOR_BIN_DIR:=/usr/local/bin}"
+: "${RV32M_VERILATOR_BIN_DIR:=}"
 : "${RV32M_GTKWAVE:=gtkwave}"
-
-# --- Synopsys (optional; leave empty to skip adding to PATH) ---
-: "${RV32M_VCS_HOME:=/opt/synopsys/vcs/Q-2020.03-SP2-7}"
-: "${RV32M_VERDI_HOME:=/opt/synopsys/verdi/R-2020.12-SP1}"
-: "${RV32M_DC_HOME:=/opt/synopsys/syn/R-2020.09-SP4}"
-# : "${RV32M_SNPSLMD_LICENSE_FILE:=27000@your-license-server}"
 
 # --- IHP SG13G2 PDK (SRAM macro models for simulation; LibreLane PDK_ROOT) ---
 : "${PDK_ROOT:=${HOME}/.ciel}"
 
-# --- Design Compiler PDK (optional) ---
-: "${TSMC013_TARGET_LIB:=${HOME}/PDK/TSMC_013/synopsys/slow.db}"
+# --- LibreLane (Python venv; runs the flow in its Docker image) ---
+: "${LIBRELANE_VENV:=${HOME}/.venv/librelane}"
 
 # CentOS 7 / RHEL: Verilator C++ link often needs a newer g++ (uncomment if needed)
 # if [[ -f /opt/rh/devtoolset-11/enable ]]; then
@@ -80,28 +80,16 @@ fi
 export RV32M_RISCV_TOOLCHAIN_BIN="${RV32M_RISCV_TOOLCHAIN_BIN:-${PROJECT_ROOT}/riscv_toolchain/bin}"
 export RV32M_RISCV_GNU_PREFIX="${RV32M_RISCV_GNU_PREFIX:-riscv64-unknown-elf-}"
 export PDK_ROOT
+export LIBRELANE_VENV
 
 export RV32M_VERILATOR="${RV32M_VERILATOR:-verilator}"
 export RV32M_VERILATOR_BIN_DIR="${RV32M_VERILATOR_BIN_DIR:-}"
 export RV32M_GTKWAVE="${RV32M_GTKWAVE:-gtkwave}"
 
-export RV32M_VCS_HOME="${RV32M_VCS_HOME:-}"
-export RV32M_VERDI_HOME="${RV32M_VERDI_HOME:-}"
-export RV32M_DC_HOME="${RV32M_DC_HOME:-}"
-
-export TSMC013_TARGET_LIB="${TSMC013_TARGET_LIB:-}"
-
-# Legacy aliases used by scripts/internal/*.sh and sim/Makefile shortcuts
+# Short names used by scripts/internal/*.sh, verilator_build.sh and sim/Makefile
 export TOOLCHAIN="$RV32M_RISCV_TOOLCHAIN_BIN"
 export PREFIX="$RV32M_RISCV_GNU_PREFIX"
-export VCS_HOME="$RV32M_VCS_HOME"
-export VERDI_HOME="$RV32M_VERDI_HOME"
-export NOVAS_HOME="${NOVAS_HOME:-$RV32M_VERDI_HOME}"
-export DC_HOME="$RV32M_DC_HOME"
 export VERILATOR="$RV32M_VERILATOR"
-if [[ -n "${RV32M_SNPSLMD_LICENSE_FILE:-}" ]]; then
-  export SNPSLMD_LICENSE_FILE="$RV32M_SNPSLMD_LICENSE_FILE"
-fi
 
 unset _open_rv_here
 
@@ -115,13 +103,7 @@ open_rv32m_path_prepend() {
 open_rv32m_path_prepend "$RV32M_ROOT/scripts"
 open_rv32m_path_prepend "$RV32M_RISCV_TOOLCHAIN_BIN"
 [[ -n "$RV32M_VERILATOR_BIN_DIR" && -d "$RV32M_VERILATOR_BIN_DIR" ]] && open_rv32m_path_prepend "$RV32M_VERILATOR_BIN_DIR"
-[[ -n "${RV32M_DC_HOME}" && -d "${RV32M_DC_HOME}/bin" ]] && open_rv32m_path_prepend "${RV32M_DC_HOME}/bin"
-[[ -n "${RV32M_VERDI_HOME}" && -d "${RV32M_VERDI_HOME}/bin" ]] && open_rv32m_path_prepend "${RV32M_VERDI_HOME}/bin"
-[[ -n "${RV32M_VCS_HOME}" && -d "${RV32M_VCS_HOME}/bin" ]] && open_rv32m_path_prepend "${RV32M_VCS_HOME}/bin"
 
-export RV32M_FILELIST_SOC="$RV32M_ROOT/sim/filelists/verdi_soc.f"
-export RV32M_FILELIST_CORE="$RV32M_FILELIST_SOC"
-export RV32M_FILELIST_AHB="$RV32M_FILELIST_SOC"
 export RV32M_TARGET="${RV32M_TARGET:-soc}"
 export RV32M_LAST_CASE_DIR_FILE="${RV32M_ROOT}/.open_rv32m_last_case_build_dir"
 
@@ -147,12 +129,15 @@ echo "  PROJECT_ROOT=$PROJECT_ROOT"
 echo "  RV32M_RISCV_TOOLCHAIN_BIN=$RV32M_RISCV_TOOLCHAIN_BIN"
 echo "  RV32M_RISCV_GNU_PREFIX=$RV32M_RISCV_GNU_PREFIX"
 echo "  RV32M_VERILATOR=$RV32M_VERILATOR ($(command -v "$RV32M_VERILATOR" 2>/dev/null || echo missing))"
-echo "  RV32M_VCS_HOME=${RV32M_VCS_HOME:-<unset>} (vcs: $(command -v vcs 2>/dev/null || echo missing))"
-echo "  RV32M_VERDI_HOME=${RV32M_VERDI_HOME:-<unset>} (verdi: $(command -v verdi 2>/dev/null || echo missing))"
-echo "  RV32M_DC_HOME=${RV32M_DC_HOME:-<unset>}"
+echo "  RV32M_GTKWAVE=$RV32M_GTKWAVE ($(command -v "$RV32M_GTKWAVE" 2>/dev/null || echo missing))"
 if [[ -d "$PDK_ROOT/ihp-sg13g2/libs.ref/sg13g2_sram/verilog" ]]; then
   echo "  PDK_ROOT=$PDK_ROOT (IHP SRAM models: ok)"
 else
   echo "  PDK_ROOT=$PDK_ROOT (IHP SRAM models: MISSING — install ihp-sg13g2 or set PDK_ROOT)"
+fi
+if [[ -x "$LIBRELANE_VENV/bin/python" ]]; then
+  echo "  LIBRELANE_VENV=$LIBRELANE_VENV (ok; only needed for make -C librelane)"
+else
+  echo "  LIBRELANE_VENV=$LIBRELANE_VENV (missing; only needed for make -C librelane)"
 fi
 echo "  After run_case.sh:  t  -> cd to last case build dir"

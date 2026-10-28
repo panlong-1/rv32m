@@ -11,23 +11,22 @@ Usage:
 
 Options:
   --target soc|core|ahb Simulation target (default: soc). core/ahb are aliases for soc.
-  --sim vcs|verilator   HDL simulator (default: verilator). On CentOS 7 use
+  --sim verilator       HDL simulator (Verilator is the only supported one; the
+                        option is kept for compatibility). On CentOS 7 use
                         devtoolset (scripts/verilator_build.sh tries it) or set CXX.
-  --fsdb                Dump FSDB waveform
-  --vcd                 Dump VCD waveform
+  --vcd                 Dump VCD waveform (open with scripts/open_gtkwave.sh)
   --trace               Enable testbench trace plusarg
   --pc-trace            Dump PC trace TSV from the testbench
   --pc-trace-file FILE  Override PC trace output path
   --pc-trace-each-cycle Write one PC trace row every clock
-  --kdb                 Build VCS KDB for Verdi source navigation
   --max-cycles N        Override max cycle count
   --build-dir DIR       Override output directory
   -h, --help            Show this help
 
 Output:
   build/sim/soc/<case>/ by default, containing ELF/HEX/DUMP,
-  simulator build (verilator/ or vcs/), simulation log (*.sim.log),
-  optional FSDB/VCD, and open_verdi.sh when using VCS.
+  the Verilator build (verilator/), simulation log (*.sim.log) and
+  optional VCD / pc_trace.tsv.
 
   Asm may live under tests/core/asm/ or tests/periph/<ip>/; plusargs are picked from
   the same directory as the .S file, then tests/core/asm/<case>.plusargs.
@@ -35,7 +34,7 @@ EOF
 }
 
 TARGET="${RV32M_TARGET:-soc}"
-SIMULATOR="${RV32M_SIMULATOR:-verilator}"
+SIMULATOR=verilator
 SRC=""
 
 while (($#)); do
@@ -54,10 +53,6 @@ while (($#)); do
       ;;
     --sim=*)
       SIMULATOR="${1#*=}"
-      shift
-      ;;
-    --fsdb)
-      export RUN_FSDB=1
       shift
       ;;
     --vcd|--waves)
@@ -83,10 +78,6 @@ while (($#)); do
     --pc-trace-each-cycle)
       export RV32M_PC_TRACE=1
       export RV32M_PC_TRACE_EACH_CYCLE=1
-      shift
-      ;;
-    --kdb)
-      export RV32M_VCS_KDB=1
       shift
       ;;
     --max-cycles)
@@ -130,8 +121,12 @@ if [[ -z "$SRC" && $# -gt 0 ]]; then
 fi
 SRC="${SRC:-$ROOT/tests/core/asm/smoke.S}"
 
+if [[ "$SIMULATOR" != "verilator" ]]; then
+  echo "ERROR: --sim must be verilator (the only supported simulator), got: $SIMULATOR" >&2
+  exit 2
+fi
+
 export RV32M_TARGET="$TARGET"
-export RV32M_SIMULATOR="$SIMULATOR"
 
 case "$TARGET" in
   core|ahb)

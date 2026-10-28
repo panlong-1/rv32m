@@ -55,64 +55,34 @@ def load_cases(path):
     return cases
 
 
-def write_verdi_index(root: Path, result_dir: Path) -> None:
-    """Emit an index helper that opens any per-case open_verdi.sh."""
-    script = result_dir / "open_verdi.sh"
-    body = f"""#!/usr/bin/env bash
-set -euo pipefail
-RESULT_DIR="{result_dir}"
-case_name="${{1:-}}"
-if [[ -z "$case_name" ]]; then
-  echo "Usage: $0 <case-name>" >&2
-  echo "Available cases:" >&2
-  find "$RESULT_DIR" -mindepth 3 -maxdepth 3 -name open_verdi.sh -printf '  %h\\n' | sed "s#^$RESULT_DIR/##" >&2
-  exit 2
-fi
-helper=$(find "$RESULT_DIR" -mindepth 3 -maxdepth 3 -path "*/$case_name/open_verdi.sh" | head -1)
-if [[ -z "$helper" ]]; then
-  echo "No open_verdi.sh found for case: $case_name" >&2
-  exit 1
-fi
-exec "$helper"
-"""
-    script.write_text(body, encoding="utf-8")
-    script.chmod(0o755)
-
-
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run open_rv32m regression")
+    parser = argparse.ArgumentParser(description="Run open_rv32m regression (Verilator)")
     parser.add_argument("--target", choices=["core", "ahb", "soc"], default="soc")
-    parser.add_argument("--sim", choices=["vcs", "verilator"], default="verilator")
+    parser.add_argument(
+        "--sim",
+        choices=["verilator"],
+        default="verilator",
+        help="HDL simulator (Verilator only; kept for compatibility)",
+    )
     parser.add_argument(
         "--case-list",
         default=None,
         help="Case list file (default: regress/cases/<target>.list)",
     )
     parser.add_argument("--case", action="append", dest="case_filter", help="Run only this case name")
-    parser.add_argument("--waves", action="store_true", help="Pass +vcd to simv")
-    parser.add_argument(
-        "--fsdb",
-        action="store_true",
-        help="Build with Verdi PLI and dump FSDB per case (+fsdb +fsdbfile=...); set VERDI_HOME",
-    )
-    parser.add_argument("--trace", action="store_true", help="Pass +trace to simv")
+    parser.add_argument("--waves", action="store_true", help="Dump a VCD per case (+vcd)")
+    parser.add_argument("--trace", action="store_true", help="Pass +trace to the testbench")
     parser.add_argument("--pc-trace", action="store_true", help="Write per-case pc_trace.tsv from the testbench")
     parser.add_argument(
         "--pc-trace-each-cycle",
         action="store_true",
         help="With --pc-trace, write one row every clock instead of only when PC changes",
     )
-    parser.add_argument("--dc", action="store_true", help="Run Design Compiler after simulation")
     parser.add_argument("--keep", action="store_true", help="Keep existing per-case directories")
     args = parser.parse_args()
 
-    if args.fsdb and args.sim == "verilator":
-        print("ERROR: --fsdb requires VCS/Verdi; use --sim vcs or drop --fsdb.", file=sys.stderr)
-        return 2
-
     root = Path(__file__).resolve().parents[2]
     env = os.environ.copy()
-    env["RV32M_SIMULATOR"] = args.sim
     project_root = root.parent
     env.setdefault("TOOLCHAIN", str(project_root / "riscv_toolchain" / "bin"))
     env.setdefault("PREFIX", "riscv64-unknown-elf-")
@@ -144,8 +114,6 @@ def main() -> int:
 
     summary: list[tuple[str, str, str]] = []
 
-    if args.fsdb:
-        env["RUN_FSDB"] = "1"
     if args.waves:
         env["RV32M_WAVE_VCD"] = "1"
     if args.trace:
@@ -184,8 +152,6 @@ def main() -> int:
                 str(root / "scripts/run_case.sh"),
                 "--target",
                 sim_target,
-                "--sim",
-                args.sim,
                 str(root / case.source),
             ]
             rc = run(cmd, root, case_dir / "run_case.log", case_env)
@@ -196,19 +162,13 @@ def main() -> int:
 
         summary.append((case.name, "PASS" if ok else "FAIL", str(case_dir)))
 
-    if args.dc:
-        rc = run([str(root / "scripts/dc_build.sh")], root, result_dir / "dc_build.log", env)
-        summary.append(("dc", "PASS" if rc == 0 else "FAIL", str(result_dir / "dc_build.log")))
-
-    write_verdi_index(root, result_dir)
     write_summary(result_dir, summary)
     failed = [row for row in summary if row[1] == "FAIL"]
     print(f"\nResult directory: {result_dir}")
     print(f"Summary: {result_dir / 'summary.rpt'}")
     print(f"Per-case directories: {target_dir}/<case>")
-    print(f"Verdi helper: {result_dir / 'open_verdi.sh'} <case>")
-    if args.fsdb:
-        print("FSDB: see regress/results/.../<target>/<case>/<case>.fsdb")
+    if args.waves:
+        print(f"VCD: {target_dir}/<case>/<case>.vcd (scripts/open_gtkwave.sh)")
     perf_script = root / "scripts" / "perf_summary.py"
     if perf_script.is_file() and not failed:
         perf_csv = result_dir / "perf_summary.csv"

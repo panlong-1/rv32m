@@ -26,6 +26,11 @@ Default command:
 
 Optional: `+dmem=<file>.hex` preloads data SRAM. Most tests only use `+imem`.
 
+The images are written into the IHP SRAM macro arrays before reset. Each SRAM is
+`IMEM_WORDS` / `DMEM_WORDS` / `SBMEM_WORDS` words (default 1024 = **4 KiB**). A program that
+does not fit is reported as an error, not silently truncated. Unused IMEM words read as NOP
+(`0x0000_0013`).
+
 ## Link addresses (current `tests/core/link.ld`)
 
 | Region | Address | Bus (in SoC) |
@@ -50,8 +55,9 @@ The core still does **not** read ELF on chip. Host tools convert **ELF → `.bin
 ## Integrating an external ELF
 
 1. Link with the same memory map (or share your `link.ld`).
-2. For sim: `riscv-none-elf-objcopy -O verilog prog.elf prog.hex`
-3. Run: `./scripts/run_case.sh` (if wired) or manual sim with `+imem=prog.hex`
+2. For sim: `riscv64-unknown-elf-objcopy -O verilog prog.elf prog.hex`
+3. Run: `./scripts/run_case.sh` for a `.S` source, or run an already built simulator by hand:
+   `build/sim/soc/<case>/verilator/obj_dir/Vtb_torv_soc +imem=$PWD/prog.hex`
 4. For silicon: `objcopy -O binary prog.elf prog.bin` + your boot flow
 
 Contact the integration owner to align maps and CI (`ELF → hex` for sim, `ELF → bin` for tapeout).

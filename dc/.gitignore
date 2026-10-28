@@ -1,9 +1,0 @@
-# Design Compiler generated artifacts (keep scripts/, constraints, Makefile, PDK_setup.txt)
-work/
-outputs/
-reports/
-logs/
-command.log
-filenames.log
-default.svf
-*.log

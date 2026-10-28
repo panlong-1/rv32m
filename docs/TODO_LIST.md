@@ -1,38 +1,55 @@
-# open_rv32m optimization backlog
+# rv32m backlog
 
-Items deferred from the 2026-05 review (not in the current documentation/regression pass).
+Open items as of `v0.7-open-flow`. Completed items are kept at the end for reference.
+
+## Timing / implementation (IHP SG13G2)
+
+- [ ] Close the 10 ns slow corner (1.08 V / 125 °C, currently −0.73 ns on 26 endpoints).
+  - [ ] Pre-select the EX/MEM forwarding value in EX (PC+4 vs ALU) so `ex_mem_wb_sel` leaves
+        the operand → branch target / AGU → AHB output paths. Watch the MUL → EX/MEM path,
+        which has ≈ 0.07 ns slack at the slow corner.
+  - [ ] Replace the generic 2 ns I/O budget in `librelane/constraints.sdc` with the real SoC
+        interconnect and SRAM wrapper timing.
+  - [ ] Alternatively, sign off the slow corner at 12.5 ns (80 MHz).
+- [ ] Implement `torv_soc_top` with the three IHP SRAM macros (macro placement, PDN, halos)
+      for a full SoC GDS. Size the SRAMs to the tape-out area budget (one 1024x32 macro is
+      ≈ 140k µm²).
+- [ ] Switching-activity-based power (SAIF/VCD from regression) instead of default activity.
+- [ ] Look at the 141 max-fanout warnings (soft constraint) and the `hclk` fanout of ~1700 sinks.
 
 ## Microarchitecture / IPC
 
-- [ ] Core-only zero-wait SRAM bench to separate AHB stall vs pipeline stall
-- [ ] 1-cycle local IMEM/DMEM or small caches on AHB
-- [ ] Branch early resolve / lower flush penalty
-- [ ] Simplify `stall_front` to global EX/MEM freeze + unified retire in `rv32im_core` (re-verify 32/32)
-- [ ] RV32M DIV: DesignWare / macro / stub top for DC exploration
+- [ ] Branch prediction or early resolution (taken branch costs 2 cycles).
+- [ ] Single-cycle MUL again, if timing allows (for example by retiming the operand registers
+      into ID).
+- [ ] Simplify `stall_front` toward a global EX/MEM freeze plus unified retire (re-verify the
+      full regression).
 
 ## ISA / software
 
-- [ ] Minimal trap / CSR path or syscall stub for C runtime
-- [ ] `crt0` + linker scripts + CoreMark/Dhrystone for published IPC
+- [ ] Minimal trap / CSR path, or a syscall stub for a C runtime.
+- [ ] `crt0` + C linker script (`.data`/`.bss`/stack in DMEM) + CoreMark/Dhrystone for
+      published IPC.
 
 ## Verification
 
-- [ ] Random IBUS/DBUS `HREADY` stall generator (constrained length)
-- [ ] SVA on hazard/replay (`stall_id_ex` ⇒ `stall_pc`, no MMIO replay)
-- [ ] Optional “golden RTL” negative regress for pre-BYG-006 behavior
-
-## SoC
-
-- [ ] Pipelined AHB master: latched `HSEL` / data-phase mux (see `torv_soc_top` header)
-- [ ] `ibus_valid` deassert for low-power or multi-master
-- [ ] Plusarg alias `stall_ibus_during_mem_read` (TB already arms on read via `mem_bus_active`)
-
-## Synthesis / PPA
-
-- [ ] Re-run DC with realistic clock uncertainty / wire load
-- [ ] Area breakdown: regfile vs `muldiv_unit`; pipelined multiplier option
+- [ ] Random IBUS/DBUS/SBUS `HREADY` stall generator (constrained length).
+- [ ] SVA on the hazard/replay rules (`stall_id_ex` ⇒ `stall_pc`, no MMIO replay); SymbiYosys.
+- [ ] Plusarg alias `stall_ibus_during_mem_read` (the TB already arms on reads via
+      `mem_bus_active`).
 
 ## CI / automation
 
-- [ ] GitHub/GitLab CI: `fetch_ip.sh` + `regress.sh` smoke + `deep_hazard.list`
-- [ ] Nightly full `soc.list` + archive `perf_summary.csv`
+- [ ] CI: `fetch_ip.sh` + `regress.sh` smoke + `deep_hazard.list` (needs the IHP PDK SRAM
+      models in the CI image).
+- [ ] Nightly full `soc.list`, archiving `perf_summary.csv`; weekly `make -C librelane flow`.
+
+## Done
+
+- [x] Pipelined AHB-Lite IBUS (one fetch per cycle) — `v0.2-ibus-pipe`
+- [x] Pipelined DBUS/SBUS with zero-wait loads/stores — `v0.3-dbus-pipe`
+- [x] SoC memories on IHP SG13G2 SRAM macros — `v0.4-ihp-sram`
+- [x] Open-source synthesis and RTL-to-GDS on IHP SG13G2 (LibreLane); DRC/LVS/antenna clean
+- [x] Slow-corner timing work: AGU, two-cycle MUL, Booth, post-GRT repair, registered
+      forwarding — `v0.5-timing`, `v0.6-fwd-reg`
+- [x] Repository reduced to open-source tools only — `v0.7-open-flow`

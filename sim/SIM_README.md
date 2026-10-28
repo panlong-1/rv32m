@@ -1,13 +1,16 @@
-# open_rv32m simulation
+# rv32m simulation
 
-Simulation is driven from two entry points:
+All simulation is **Verilator** on the TORV SoC testbench `sim/tb_torv_soc.sv`. There are two
+entry points:
 
 ```text
 Single case: ./scripts/run_case.sh
 Regression:  ./scripts/regress.sh
 ```
 
-`sim/Makefile` wraps those scripts for quick commands.
+`sim/Makefile` wraps both for quick commands. The assembler, the Verilator build and the run
+itself live in `scripts/internal/run_soc_sim.sh` and `scripts/verilator_build.sh`; those are not
+user entry points.
 
 ## Environment
 
@@ -18,41 +21,44 @@ source scripts/open_rv.sh
 # or: source regress/env.sh   # same effect
 ```
 
-Important variables (see `scripts/open_rv.sh`):
+Variables (see `scripts/open_rv.sh`):
 
-- `RV32M_ROOT` — this repo
-- `RV32M_RISCV_TOOLCHAIN_BIN`, `RV32M_RISCV_GNU_PREFIX` — RISC-V GNU toolchain
-- `RV32M_VERILATOR`, `RV32M_VERILATOR_BIN_DIR`, `RV32M_GTKWAVE`
-- `RV32M_VCS_HOME`, `RV32M_VERDI_HOME`, `RV32M_DC_HOME`, `RV32M_SNPSLMD_LICENSE_FILE` (optional)
-- `RV32M_SIMULATOR` — `verilator` (default) or `vcs`
-- `RV32M_FILELIST_CORE`, `RV32M_FILELIST_AHB`
+- `RV32M_ROOT` — this repository.
+- `RV32M_RISCV_TOOLCHAIN_BIN`, `RV32M_RISCV_GNU_PREFIX` — RISC-V GNU toolchain. It defaults
+  to `$PROJECT_ROOT/riscv_toolchain/bin`, falling back to `/usr/bin` for the Ubuntu package.
+- `RV32M_VERILATOR`, `RV32M_VERILATOR_BIN_DIR`, `RV32M_GTKWAVE`.
+- `PDK_ROOT` — IHP SG13G2 PDK (default `~/.ciel`). The SoC SRAMs are simulated with the PDK
+  models `$PDK_ROOT/ihp-sg13g2/libs.ref/sg13g2_sram/verilog/RM_IHPSG13_1P_*.v`, which
+  `rtl/filelist.f` lists, compiled with `-DFUNCTIONAL`.
 
-**Verilator on older hosts (e.g. CentOS 7):** `verilator_build.sh` may source `devtoolset-11` (or 9/10). You can also `source /opt/rh/devtoolset-11/enable` before building, or set `RV32M_VERILATOR_BIN_DIR`.
+Verilator flags (`scripts/verilator_build.sh`):
+
+- `--binary --timing --trace -O1 -DFUNCTIONAL`.
+- `-Wno-fatal -Wno-TIMESCALEMOD -Wno-ASSIGNIN`. `ASSIGNIN` is needed because the testbench
+  `force`s UART FIFO inputs.
+- **Older hosts (e.g. CentOS 7):** the script sources `devtoolset-11/10/9` when the default
+  `g++` cannot build C++17. You can also set `CXX`.
 
 ## `sim/Makefile` (optional)
 
-Forwards to `scripts/run_case.sh` / `scripts/regress.sh`. Prefer calling those scripts from the repo root.
+These targets forward to `scripts/run_case.sh` and `scripts/regress.sh`:
 
 ```bash
-cd sim
-make run CASE=smoke
-make ahb CASE=sbus
-make run CASE=smoke SIM=vcs FSDB=1 PC_TRACE=1
-make regress REGRESS_CASE=alu
-make regress TARGET=ahb REGRESS_CASE=sbus PC_TRACE=1
-make list
-make env
+make -C sim run CASE=smoke
+make -C sim run CASE=hazard VCD=1 PC_TRACE=1
+make -C sim gtkwave CASE=hazard
+make -C sim regress
+make -C sim regress REGRESS_CASE=alu
+make -C sim list
+make -C sim env
 ```
 
-Common variables:
+Variables:
 
 ```text
-TARGET=core|ahb
-CASE=<asm stem>
-ASM=<explicit path to .S>
-REGRESS_CASE=<one case name for make regress>
-SIM=verilator|vcs
-FSDB=1 VCD=1 TRACE=1 PC_TRACE=1 PC_TRACE_EACH_CYCLE=1 KDB=1
+CASE=<asm stem>            ASM=<explicit path to .S>
+REGRESS_CASE=<case name>   (one case for make regress)
+VCD=1 TRACE=1 PC_TRACE=1 PC_TRACE_EACH_CYCLE=1
 MAX_CYCLES=N BUILD_DIR=<dir> PC_TRACE_FILE=<file>
 ```
 
@@ -65,86 +71,57 @@ MAX_CYCLES=N BUILD_DIR=<dir> PC_TRACE_FILE=<file>
 Examples:
 
 ```bash
-# Core, no waveform by default
 ./scripts/run_case.sh tests/core/asm/alu.S
-
-# Core, FSDB (VCS + Verdi)
-./scripts/run_case.sh --sim vcs --fsdb tests/core/asm/hazard.S
-
-# AHB, FSDB (core asm or periph asm)
-./scripts/run_case.sh --sim vcs --target ahb --fsdb tests/core/asm/sbus.S
-./scripts/run_case.sh --target ahb tests/periph/apb_uart_sv/uart_smoke.S
-
-# Custom output directory
-./scripts/run_case.sh --sim vcs --fsdb \
-  --build-dir build/debug/sbus tests/core/asm/sbus.S
-```
-
-Default output (all targets use TORV SoC; `--target core|ahb` are legacy aliases):
-
-```text
-build/sim/soc/<case>/
-```
-
-## Program loading (ELF / HEX)
-
-The CPU does **not** load ELF at runtime. `run_case.sh` builds a memory image and the testbench loads it **before reset**:
-
-| Step | What happens |
-|------|----------------|
-| 1 | `riscv-*-gcc` + `tests/core/link.ld` → `build/sim/soc/<case>/<case>.elf` (`.text` linked at **`0x0000_0000`**) |
-| 2 | `objcopy -O verilog` → `<case>.hex` |
-| 3 | Simulator runs with **`+imem=<case>.hex`** → image copied into **instruction SRAM** |
-| 4 | Optional **`+dmem=<file>.hex`** → **data SRAM** (most asm tests omit this; data is filled by stores at **`0x2000_0000`**) |
-| 5 | Reset released; core fetches from **PC = 0x0** |
-
-**For software developers**
-
-- Keep building **ELF** for debug (`objdump`, GDB). ELF is the toolchain source of truth.
-- Our script auto-generates **`.hex` for simulation**; you do not need a manual conversion step when using `run_case.sh`.
-- To run only your ELF: `objcopy -O verilog prog.elf prog.hex`, then pass `+imem=prog.hex` (or ask us to hook your build into `run_case.sh`).
-
-**Silicon / FPGA** (not covered in detail here): same ELF is usually converted to a flat **`.bin`** plus a **boot path** (Flash, UART loader, or BRAM init in the bitstream). The chip does not parse ELF.
-
-Memory map: [docs/torv_address_map.md](../docs/torv_address_map.md). Short software-focused summary: [docs/loading.md](../docs/loading.md).
-
-Typical contents:
-
-```text
-<case>.elf
-<case>.hex
-<case>.dump
-<case>.sim.log           # TORV SoC
-<case>.fsdb              # with --fsdb
-<case>.vcd               # with --vcd
-verilator/
-  obj_dir/
-    Vtb_torv_soc
-  verilator.log
-vcs/
-  simv
-  compile.log
-  csrc/
-  simv.daidir/
-open_verdi.sh
-run_case.log             # when invoked from regress
+./scripts/run_case.sh --vcd tests/core/asm/hazard.S
+./scripts/run_case.sh tests/periph/apb_uart_sv/uart_smoke.S
+./scripts/run_case.sh --vcd --build-dir build/debug/sbus tests/core/asm/sbus.S
 ```
 
 ### `run_case.sh` options
 
-- `--target soc` — TORV SoC (default). `core|ahb` are legacy aliases.
-- `--sim verilator|vcs` — default `verilator`; FSDB/`--kdb` need VCS.
-- `--fsdb` — FSDB (VCS only).
-- `--vcd` — VCD.
-- `--trace` — passes `+trace` to the testbench.
-- `--pc-trace` — write `pc_trace.tsv` from the TB.
+- `--vcd` (`--waves`) — dump `<case>.vcd`.
+- `--trace` — pass `+trace` to the testbench.
+- `--pc-trace` — write `pc_trace.tsv`.
 - `--pc-trace-file FILE` — PC trace path.
-- `--pc-trace-each-cycle` — one line per cycle; default logs only when PC changes.
-- `--kdb` — VCS KDB for Verdi source browsing (VCS only).
-- `--max-cycles N` — watchdog limit.
-- `--build-dir DIR` — output directory.
+- `--pc-trace-each-cycle` — one row per cycle. By default a row is written only when the PC
+  changes.
+- `--max-cycles N` — watchdog limit (default 20000).
+- `--build-dir DIR` — output directory (default `build/sim/soc/<case>/`).
+- `--target soc` — the only target. `core` and `ahb` are accepted as deprecated aliases.
+- `--sim verilator` — accepted for compatibility; Verilator is the only simulator.
 
-By default the case output directory is recreated. To keep it: `RV32M_KEEP_BUILD=1`.
+The case directory is recreated on every run. To keep it, set `RV32M_KEEP_BUILD=1`.
+
+Output:
+
+```text
+build/sim/soc/<case>/
+  <case>.elf  <case>.hex  <case>.dump
+  <case>.sim.log           # testbench log ([PERF], [PASS]/[FAIL])
+  <case>.vcd               # with --vcd
+  pc_trace.tsv             # with --pc-trace
+  verilator/obj_dir/Vtb_torv_soc
+  verilator/verilator.log
+  run_case.log             # when invoked from regress
+```
+
+## Program loading (ELF / HEX)
+
+The CPU does **not** load the ELF at runtime. `run_case.sh` builds a memory image, and the
+testbench loads it into the SRAM macro arrays **before reset**:
+
+| Step | What happens |
+|------|--------------|
+| 1 | `${PREFIX}gcc -march=rv32im -mabi=ilp32 -nostdlib` with `tests/core/link.ld` produces `<case>.elf` (`.text` at `0x0000_0000`) |
+| 2 | `objcopy -O verilog` produces `<case>.hex` |
+| 3 | `+imem=<case>.hex` loads the image into the instruction SRAM (`u_i_sram`). The rest of IMEM is filled with NOPs. An image larger than the macro is an error. |
+| 4 | Optional `+dmem=<file>.hex` loads the data SRAM. Most tests write their data with stores to `0x2000_0000`. |
+| 5 | Reset is released and the core fetches from PC `0x0`. |
+
+The SRAMs are IHP `RM_IHPSG13_1P_<WORDS>x32` macros. The testbench writes their behavioral
+`memory` arrays directly through hierarchical paths (`TORV_IMEM` / `TORV_DMEM` / `TORV_SMEM`
+macros in `tb_torv_soc.sv`). The default size is 1024 words (4 KiB) each. See
+[docs/torv_address_map.md](../docs/torv_address_map.md) and [docs/loading.md](../docs/loading.md).
 
 ## Regression
 
@@ -152,50 +129,39 @@ By default the case output directory is recreated. To keep it: `RV32M_KEEP_BUILD
 ./scripts/regress.sh [options]
 ```
 
-Examples:
-
 ```bash
-./scripts/regress.sh
+./scripts/regress.sh                              # regress/cases/soc.list (33 cases)
 ./scripts/regress.sh --case alu
-./scripts/regress.sh --sim vcs --fsdb
-./scripts/regress.sh --sim vcs --case sbus --fsdb
 ./scripts/regress.sh --case smoke --pc-trace
-./scripts/regress.sh --case perf_alu_chain --case perf_branch_loop \
-  --case perf_loadstore_loop --case perf_mul_loop
+./scripts/regress.sh --case-list regress/cases/deep_hazard.list
 ./scripts/regress.sh --case perf_alu_chain --case perf_branch_loop \
   --case perf_loadstore_loop --case perf_mul_loop
 ```
 
-Case lists (default when `--case-list` omitted):
+Options:
+- `--case NAME` (repeatable);
+- `--case-list FILE`;
+- `--waves`;
+- `--trace`;
+- `--pc-trace`, `--pc-trace-each-cycle`;
+- `--keep` — keep per-case directories.
 
-| `--target` | Default list |
-|------------|----------------|
-| `soc` | `regress/cases/soc.list` (32 asm cases) |
-| `core` / `ahb` | legacy lists; simulation still uses TORV SoC (`tb_torv_soc`) |
-
-Other lists: `deep_hazard.list`, `periph_replay.list`, `periph.list`, `ahb_replay.list`.
-
-First TORV SoC run fetches SoCBUS + PULP UART via `scripts/fetch_ip.sh` if missing (`ip/README.md`).
-
-Regression tree:
+The first run fetches SoCBUS and the PULP UART with `scripts/fetch_ip.sh` if they are missing
+(see `ip/README.md`).
 
 ```text
 regress/results/YYYYMMDD_HHMMSS/
-  summary.rpt
-  open_verdi.sh
+  summary.rpt              # case,status,detail
+  perf_summary.csv         # written when all cases pass
   soc/<case>/...
 ```
 
-Notes:
-
-- Each case has its own directory.
-- `summary.rpt` aggregates status.
-- Legacy `builtin` case type was removed; use `soc.list` asm tests only.
-- Peripheral asm lives under `tests/periph/<ip>/`; `.plusargs` beside the `.S` file is auto-loaded.
+Peripheral tests live under `tests/periph/<ip>/`. A `.plusargs` file next to the `.S` is loaded
+automatically.
 
 ## Performance counters
 
-`tb_torv_soc` prints `[PERF]` before PASS when the asm case writes `tohost=1`:
+`tb_torv_soc` prints `[PERF]` lines before PASS:
 
 ```text
 [PERF] cycles=<N> instr=<N> ipc=<N>
@@ -203,155 +169,96 @@ Notes:
 [PERF] stall if=<N> id=<N> ex=<N> flush=<N> dbus_r=<N> dbus_w=<N> sbus_r=<N> sbus_w=<N>
 ```
 
-Semantics:
-
-- `cycles` — cycles from reset deassert until PASS tohost.
-- `instr` — non-NOP instructions entering EX (approximate retired count for this in-order core); excludes flush/stall bubbles and `addi x0,x0,0`.
+- `cycles` — cycles from reset deassertion until the PASS `tohost` store.
+- `instr` — non-NOP instructions entering EX. This is approximately the retired count for this
+  in-order core; bubbles and `addi x0,x0,0` are excluded.
 - `ipc` — `instr / cycles`.
-- `type` — coarse opcode mix.
-- `stall` — observed stall/flush; under AHB includes bridge/memory effects.
-- `dbus_*` / `sbus_*` — valid/ready (core) or non-IDLE transfers (AHB).
+- `stall` / `flush` — cycles with the corresponding pipeline hold or flush.
+- `dbus_*` / `sbus_*` — cycles with a non-IDLE AHB address phase (read/write).
 
-Built-in perf cases:
+`scripts/perf_summary.py <result-dir> --csv out.csv` collects them into one table.
 
 | Case | Role |
 |------|------|
-| `perf_alu_chain` | ALU chains, data hazards, branch cost |
-| `perf_branch_loop` | Tight branch loop, taken-branch / flush |
-| `perf_loadstore_loop` | DBUS load/store loop, memory stalls |
-| `perf_mul_loop` | RV32M multiply loop |
-
-Extract from a run:
-
-```bash
-rg "\[PERF\]" regress/results/<run>/soc/*/*.sim.log
-```
+| `perf_alu_chain` | ALU chains, forwarding, loop branch |
+| `perf_branch_loop` | Tight branch loop: taken branches and flushes |
+| `perf_loadstore_loop` | DBUS load/store loop |
+| `perf_mul_loop` | RV32M multiply loop (two-cycle `MUL`) |
 
 ## Test termination
 
-Tests do not rely on simulation time for pass/fail. They write **`0xF000_0000`**:
+Tests store to **`0xF000_0000`** (`tohost`). The testbench samples that store when SBUS HREADY
+is high:
 
 ```text
-write 1     -> PASS, TB calls $finish(0)
-write != 1  -> FAIL, TB calls $finish(1)
+write 1     -> [PASS] TORV, $finish(0)
+write != 1  -> [FAIL], $finish(1)
 ```
 
-`MAX_CYCLES` / `--max-cycles` is a hang watchdog. New asm cases should use:
+`--max-cycles` is only a hang watchdog. New assembly cases use the macros:
 
 ```asm
   .include "tests/core/asm/test_macros.inc"
 
 pass:
   RVTEST_PASS
-
 fail:
   RVTEST_FAIL
 ```
 
-## PC trace
+## Testbench plusargs
 
-The testbench writes TSV directly (no VCD/FSDB parsing required) for offline correlation with `objdump`:
+| Plusarg | Purpose |
+|---------|---------|
+| `+imem=<hex>` / `+dmem=<hex>` | Program / data image |
+| `+max_cycles=N` | Watchdog (also allowed inside `.plusargs`) |
+| `+vcd`, `+vcdfile=<path>` | VCD dump |
+| `+trace` | Testbench trace prints |
+| `+pc_trace`, `+pc_trace_file=<path>`, `+pc_trace_each_cycle` | PC / WB trace TSV |
+| `+stall_sbus_writes=N` | Hold SBUS HREADY low for N cycles on the first SBUS store |
+| `+stall_ibus_during_mem_write=N` | Hold IBUS HREADY low for N cycles while a store is in MEM |
+| `+replay_expect=N` | Fail if more than N UART THR pushes are seen (bus replay check) |
+| `+replay_expect_rbr=N` | Expect exactly N UART RBR reads |
+| `+uart_rx_byte=<hex>` | Byte injected into the UART RX FIFO |
+
+## PC trace
 
 ```bash
 ./scripts/run_case.sh --pc-trace tests/core/asm/smoke.S
-./scripts/run_case.sh --target ahb --pc-trace tests/core/asm/sbus.S
-./scripts/regress.sh --case smoke --pc-trace
+./scripts/check_hazard_dup_trace.py --case hazard_ibus_insn_dup --run
 ```
 
-### Bus stall plusargs (core TB only)
+The trace is tab-separated, with columns `time_ps`, `pc_hex`, `ibus_inst_hex`, `if_id_pc_hex`,
+`if_id_inst_hex`, `wb_we`, `wb_rd`, `wb_wdata_hex`. The WB fields are the MEM/WB stage in that
+cycle. `ibus_inst_hex` and `if_id_inst_hex` sit at different pipeline stages, so align them with
+the disassembly using `pc_hex` / `if_id_pc_hex`. `check_hazard_dup_trace.py` counts `x1`
+writebacks in the directed hazard cases without opening a waveform.
 
-Directed deep-hazard cases ship a sibling `tests/core/asm/<case>.plusargs` file (loaded automatically by `run_case.sh`):
-
-| Plusarg | Purpose |
-|---------|---------|
-| `+stall_sbus_writes=N` | Hold `sbus_ready` low for N cycles on the first SBUS store |
-| `+stall_ibus_during_mem_write=N` | Hold `ibus_ready` low for N cycles while a store is in MEM |
-| `+max_cycles=N` | Watchdog override (optional in `.plusargs`) |
-
-### TORV peripheral plusargs (`tb_torv_soc`)
-
-Used by `tests/periph/apb_uart_sv/*.plusargs` (replay / UART smoke):
-
-| Plusarg | Purpose |
-|---------|---------|
-| `+replay_expect=N` | Expect exactly N THR pushes to PULP UART FIFO (checked on PASS/timeout) |
-| `+stall_ibus_during_mem_write=N` | IBUS back-pressure during MEM store (replay stress) |
-
-### Manual `simv` plusargs
-
-| Plusarg | Meaning |
-|---------|---------|
-| `+pc_trace` | Enable PC trace file |
-| `+pc_trace_file=<path>` | Output path (default `pc_trace.tsv`) |
-| `+pc_trace_each_cycle` | Every cycle; **without** it, log only when **PC changes** |
-
-Columns (tab-separated): `time_ps`, `pc_hex`, `ibus_inst_hex`, `if_id_pc_hex`, `if_id_inst_hex`, `wb_we`, `wb_rd`, `wb_wdata_hex` (WB fields are the MEM/WB stage in that cycle).
-
-Use `scripts/check_hazard_dup_trace.py` on directed hazard cases to count `x1` writebacks without opening a waveform.
-
-Example (from the case directory):
+To rerun a built simulator by hand from the case directory:
 
 ```bash
-./vcs/simv +imem="$PWD/smoke.hex" +max_cycles=5000 \
+./verilator/obj_dir/Vtb_torv_soc +imem="$PWD/smoke.hex" +max_cycles=5000 \
   +pc_trace +pc_trace_file="$PWD/pc.tsv"
-head pc.tsv
 ```
 
-`ibus_inst_hex` and `if_id_inst_hex` are offset in the pipeline; align disassembly using `pc_hex` / `if_id_pc_hex`.
-
-## Waveforms (VCD / GTKWave / FSDB)
-
-VCD:
+## Waveforms (VCD / GTKWave)
 
 ```bash
 ./scripts/run_case.sh --vcd tests/core/asm/smoke.S
-./scripts/regress.sh --waves
+./scripts/open_gtkwave.sh smoke                   # build/sim/soc/smoke/smoke.vcd
+./scripts/open_gtkwave.sh --vcd path/to/file.vcd
+./scripts/regress.sh --waves                      # one VCD per case
 ```
 
-**GTKWave** (install via your distro, or set `RV32M_GTKWAVE` in `scripts/open_rv.sh` / `open_rv.local.sh`):
-
-```bash
-./scripts/open_gtkwave.sh smoke
-# Or: make run CASE=smoke VCD=1 && make gtkwave CASE=smoke
-```
-
-FSDB:
-
-```bash
-./scripts/run_case.sh --fsdb tests/core/asm/smoke.S
-./scripts/regress.sh --fsdb
-```
-
-FSDB needs Verdi VCS PLI, typically:
-
-```text
-$VERDI_HOME/share/PLI/VCS/LINUX64/novas.tab
-$VERDI_HOME/share/PLI/VCS/LINUX64/pli.a
-```
-
-Scripts also try `LINUXAMD64`.
-
-## Verdi
-
-```bash
-cd build/sim/soc/alu
-./open_verdi.sh
-```
-
-Regression helper:
-
-```bash
-regress/results/<run>/open_verdi.sh alu
-```
-
-`open_verdi.sh` picks filelist/top, prefers `<case>.fsdb`, else `<case>.vcd`, and adds `vcs/simv.daidir` when present.
-
-Asm compile + simulator runs live under **`scripts/internal/`** (not a user entry point — use **`scripts/run_case.sh`**).
-
-TORV peripheral RTL: `ip/third_party/socbus` (`AHB_APB_BRIDGE`), `ip/third_party/apb_uart_sv` — instantiated in `rtl/torv_soc_top.sv` (see `ip/README.md`, `scripts/fetch_ip.sh`).
+To use a GTKWave binary that is not on `PATH`, set `RV32M_GTKWAVE`.
 
 ## Troubleshooting
 
-- **No FSDB** — use `--fsdb` with VCS; check `VERDI_HOME` / `NOVAS_HOME` and PLI paths.
-- **Verdi no RTL** — re-run with `--kdb`.
-- **License errors** — check `SNPSLMD_LICENSE_FILE` and related Synopsys variables.
+- **`IHP SRAM models: MISSING`** when sourcing `open_rv.sh` — install the `ihp-sg13g2` PDK
+  (see [docs/open_source_flow.md](../docs/open_source_flow.md)) or point `PDK_ROOT` at it.
+- **`riscv64-unknown-elf-gcc: not found`** — install `gcc-riscv64-unknown-elf` or set
+  `RV32M_RISCV_TOOLCHAIN_BIN` / `RV32M_RISCV_GNU_PREFIX`.
+- **Verilator C++ build fails** — check `build/sim/soc/<case>/verilator/verilator.log`. You need
+  Verilator ≥ 5.0 (for `--timing`) and a C++17 compiler.
+- **`TIMEOUT waiting for TORV tohost`** — the program never reached `tohost`. Rerun with
+  `--pc-trace` or `--vcd`.

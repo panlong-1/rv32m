@@ -6,29 +6,9 @@ regress/results/
 ip/third_party/
 tests/core/asm/work/
 
-# Synopsys/Verdi generated files
-verdiLog/
-novas.conf
-sim/filelists/verdiLog/
-sim/filelists/novas.conf
-*.fsdb
+# Waveforms
 *.vcd
-*.vpd
-*.key
-ucli.key
-simv
-simv.daidir/
-csrc/
-
-# Design Compiler generated artifacts
-dc/work/
-dc/outputs/
-dc/reports/
-dc/logs/
-dc/alib-*/
-dc/command.log
-dc/filenames.log
-dc/default.svf
+*.fst
 
 # LibreLane (IHP SG13G2) run directories
 librelane/runs/

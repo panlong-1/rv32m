@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Optional overrides — only needed if you do not want to edit scripts/open_rv.sh
-# site defaults, or you must keep secrets out of git.
+# site defaults, or you keep machine-specific paths out of git.
 #
 #   cp scripts/open_rv.local.sh.example scripts/open_rv.local.sh
 #   source scripts/open_rv.sh
@@ -9,4 +9,6 @@
 
 # export RV32M_RISCV_TOOLCHAIN_BIN="/other/path/riscv/bin"
 # export RV32M_RISCV_GNU_PREFIX="riscv32-unknown-elf-"
-# export RV32M_SNPSLMD_LICENSE_FILE="27000@your-license-server"
+# export RV32M_VERILATOR_BIN_DIR="/opt/verilator/bin"
+# export PDK_ROOT="$HOME/.ciel"
+# export LIBRELANE_VENV="$HOME/.venv/librelane"

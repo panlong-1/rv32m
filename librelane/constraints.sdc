@@ -1,4 +1,6 @@
-# rv32im_ahb_top on IHP SG13G2 — mirrors dc/constraints.sdc (units: ns, pF)
+# rv32im_ahb_top on IHP SG13G2 (units: ns, pF)
+# I/O delays are a generic 2 ns budget for the AHB slaves outside the core;
+# tighten or relax them to the real SoC interconnect / SRAM wrapper timing.
 
 set clk_port hclk
 set rst_port hresetn

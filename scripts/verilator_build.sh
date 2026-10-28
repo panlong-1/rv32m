@@ -75,6 +75,7 @@ VL_CMD=(
   "$VERILATOR" --binary --timing --trace
   -Wno-fatal
   -Wno-TIMESCALEMOD
+  -Wno-ASSIGNIN
   -DFUNCTIONAL
   -Mdir obj_dir
   -CFLAGS "-std=c++17"

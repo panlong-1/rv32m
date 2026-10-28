@@ -1,346 +1,235 @@
 # rv32m
 
-Open-source **RV32I + M-extension** five-stage in-order Harvard core (no CSRs/traps/C extension). Verilator-first simulation with directed asm tests, regression automation, and optional Synopsys VCS/Verdi/DC. Waveforms: **VCD + GTKWave**; FSDB when using VCS.
+Open-source **RV32I + M-extension** five-stage in-order core and the **TORV** SoC
+(**T**orino **O**pen **R**ISC-**V**), with a fully open-source flow from RTL to GDS:
+
+- **Simulation:** Verilator + GTKWave, directed RISC-V assembly tests, self-checking
+  testbench, regression and performance counters.
+- **Physical implementation:** LibreLane (Yosys, OpenROAD, Magic, KLayout, Netgen) on the
+  **IHP SG13G2** 130 nm open PDK, including the IHP SRAM macros.
+
+No commercial EDA tool or proprietary PDK is needed. Step-by-step instructions are in
+[docs/open_source_flow.md](docs/open_source_flow.md).
 
 ## Highlights
 
-- **ISA:** RV32I subset + RV32M (`MUL*` single-cycle; `DIV`/`REM*` multi-cycle).
-- **Pipeline:** IF / ID / EX / MEM / WB.
-- **SoC:** **TORV** (**T**orino **O**pen **R**ISC-**V**) — `torv_soc_top` integrates CPU, AHB SRAM, SoCBUS `AHB_APB_BRIDGE`, PULP UART.
-- **Buses:** Harvard inside the core; SoC exposes three **AHB-Lite** masters.
-- **Simulation:** **Verilator** (default); **VCS** via `RV32M_SIMULATOR=vcs` or `./scripts/run_case.sh --sim vcs`.
-- **Waves:** VCD from Verilator/VCS; open with **GTKWave** (`scripts/open_gtkwave.sh`, `make gtkwave`). FSDB only with VCS + Verdi PLI.
-- **PC trace:** `pc_trace.tsv` with optional WB columns for directed checks (`scripts/check_hazard_dup_trace.py`).
-- **Performance:** on PASS, logs `[PERF]` lines; after regress, `perf_summary.csv` via `scripts/perf_summary.py`.
-- **Regression:** canonical **`regress/cases/soc.list`** (TORV SoC); `deep_hazard.list` is a fast hazard subset.
-- **SoC map:** [docs/torv_address_map.md](docs/torv_address_map.md) (DMEM / SBUS SRAM / UART / tohost).
-- **Peripherals (AHB):** third-party SoCBUS `AHB_APB_BRIDGE` + PULP `apb_uart_sv` (`ip/`, `tests/periph/<ip>/`).
+- **ISA:** RV32I (no CSRs, traps or C extension) + RV32M.
+  - `MUL*`: two cycles (operand register + Booth multiplier).
+  - `DIV`/`REM*`: iterative restoring divider (≈34 cycles); divide-by-zero and
+    overflow results per the RISC-V spec.
+- **Pipeline:** IF / ID / EX / MEM / WB with:
+  - EX/MEM and MEM/WB forwarding (registered selects);
+  - load-use bubble;
+  - branches resolved in EX (2-cycle taken penalty);
+  - a dedicated AGU for load/store addresses.
+- **Buses:** Harvard core with three **pipelined AHB-Lite** masters:
+  - **IBUS** — one fetch per cycle;
+  - **DBUS / SBUS** — address phase in EX, data phase in MEM, so loads and stores to a
+    zero-wait slave never stall.
+- **TORV SoC (`torv_soc_top`):**
+  - three IHP SG13G2 SRAM macros, 4 KiB each by default, behind the zero-wait wrapper
+    `torv_ahb_sram`;
+  - SoCBUS `AHB_APB_BRIDGE` and the PULP `apb_uart_sv` UART.
+  - Address map: [docs/torv_address_map.md](docs/torv_address_map.md).
+- **Verification:**
+  - 33-case regression (`regress/cases/soc.list`) with pass/fail via a `tohost` store;
+  - `[PERF]` counters per case and `perf_summary.csv` per run;
+  - PC/WB trace checks for hazard cases.
+- **Implementation:** `rv32im_ahb_top` closes DRC, LVS and antenna checks at 10 ns
+  (results below).
 
-## Quick start (Verilator + GTKWave)
+## Repository layout
 
-Prerequisites: **Verilator**, **RISC-V GNU toolchain** (`riscv32-unknown-elf-gcc` or the prefix you configure), the **IHP SG13G2 PDK** (SoC SRAMs are `RM_IHPSG13_1P_*` macros; simulation uses their functional models from `$PDK_ROOT/ihp-sg13g2/libs.ref/sg13g2_sram/verilog`, default `PDK_ROOT=~/.ciel`), and optionally **GTKWave**.
+| Path | Contents |
+|------|----------|
+| `rtl/` | Core (`rv32im_core` and its units), AHB masters (`rv32im_ahb_fetch`, `rv32im_ahb_dport`), `rv32im_ahb_top`, SoC (`torv_soc_top`, `torv_ahb_sram`), `filelist.f` |
+| `sim/` | Testbench `tb_torv_soc.sv`, `Makefile` shortcuts, [SIM_README.md](sim/SIM_README.md) |
+| `tests/core/asm/` | Directed assembly tests, `link.ld`, per-case `.plusargs` |
+| `tests/periph/` | Peripheral tests (UART) |
+| `regress/` | Regression driver and case lists ([README](regress/README.md)) |
+| `scripts/` | `open_rv.sh` environment, `run_case.sh`, `regress.sh`, Verilator build, waveform/trace/perf helpers |
+| `ip/` | Third-party IP filelist; sources are fetched into `ip/third_party/` ([README](ip/README.md)) |
+| `librelane/` | LibreLane config, SDC, `Makefile` (`synth`, `flow`), `qor.py` |
+| `spec/` | [RV32IM_Current_Implementation.md](spec/RV32IM_Current_Implementation.md) — microarchitecture reference |
+| `docs/` | Open-source flow, address map, loading, TODO, changelog, bug notes |
 
-1. Clone this repository and load the environment (see [Environment](#environment)).
-2. Run a smoke test:
+## Prerequisites
 
-   ```bash
-   ./scripts/run_case.sh tests/core/asm/smoke.S
-   ```
+The versions below are tested (Ubuntu 24.04, also under WSL2):
 
-3. Re-run with VCD and open waves:
+| Tool | Version | Used for |
+|------|---------|----------|
+| Verilator | 5.020 (≥ 5.0 with `--timing`) | Simulation |
+| `gcc-riscv64-unknown-elf` | 13.2 | Assembling tests (`-march=rv32im -mabi=ilp32`) |
+| GTKWave | 3.3 | Waveforms (optional) |
+| Python 3, `curl`, `make`, `g++` | — | Scripts, IP fetch, Verilator C++ build |
+| IHP SG13G2 PDK | via `ciel` (LibreLane) | SRAM simulation models, implementation |
+| LibreLane | 3.0.16 (Python venv + Docker) | Synthesis, place & route, signoff (optional) |
 
-   ```bash
-   ./scripts/run_case.sh --vcd tests/core/asm/smoke.S
-   ./scripts/open_gtkwave.sh smoke
-   ```
+Ubuntu packages:
 
-   Or from `sim/`: `make run CASE=smoke VCD=1` then `make gtkwave CASE=smoke`.
+```bash
+sudo apt install verilator gcc-riscv64-unknown-elf gtkwave python3 python3-venv make g++ curl
+```
 
-4. Full core regression:
+The IHP PDK is needed **for simulation as well**, because the SoC SRAMs use the PDK's
+`RM_IHPSG13_1P_*` functional models. Install LibreLane and the PDK as described in
+[docs/open_source_flow.md](docs/open_source_flow.md#1-install-the-tools). The default
+`PDK_ROOT` is `~/.ciel`.
 
-   ```bash
-   ./scripts/regress.sh
-   ```
+## Quick start
 
-More detail: [sim/SIM_README.md](sim/SIM_README.md), [docs/loading.md](docs/loading.md), [regress/README.md](regress/README.md), [tests/core/README.md](tests/core/README.md), [tests/periph/README.md](tests/periph/README.md), [ip/README.md](ip/README.md), [spec/RV32IM_Current_Implementation.md](spec/RV32IM_Current_Implementation.md).
+```bash
+git clone https://github.com/panlong-1/rv32m.git
+cd rv32m
+source scripts/open_rv.sh                        # paths, PATH, PDK_ROOT; prints what it found
+
+./scripts/run_case.sh tests/core/asm/smoke.S     # one test (fetches third-party IP on first run)
+./scripts/regress.sh                             # full regression: 33 cases
+
+./scripts/run_case.sh --vcd tests/core/asm/smoke.S
+./scripts/open_gtkwave.sh smoke                  # waves
+
+make -C librelane                                # IHP synthesis + pre-PnR STA (minutes)
+make -C librelane flow                           # full RTL-to-GDS + signoff (~1-1.5 h)
+```
 
 ## Environment
 
-The supported way to configure paths is **`scripts/open_rv.sh`**. It lives in this repo, sets **`RV32M_ROOT`** from the script location (unless you already exported it), sets **`PROJECT_ROOT`** to the parent of the repo (default place for a sibling **`riscv_toolchain`**), prepends toolchain and optional Synopsys `bin` dirs to **`PATH`**, and exports **`RV32M_FILELIST_CORE`** / **`RV32M_FILELIST_AHB`**.
+`scripts/open_rv.sh` is the single place for paths. It:
+
+- sets `RV32M_ROOT`, `PROJECT_ROOT` (the repo's parent) and `PDK_ROOT`;
+- picks the RISC-V toolchain: `$PROJECT_ROOT/riscv_toolchain/bin` if present, otherwise
+  `/usr/bin`;
+- puts `scripts/` and the toolchain on `PATH`.
+
+After a case runs, `t` changes directory to its build folder. `source regress/env.sh` does
+the same setup from anywhere in the tree.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `RV32M_RISCV_TOOLCHAIN_BIN` | `$PROJECT_ROOT/riscv_toolchain/bin` or `/usr/bin` | Directory holding `${PREFIX}gcc` |
+| `RV32M_RISCV_GNU_PREFIX` | `riscv64-unknown-elf-` | Toolchain prefix |
+| `RV32M_VERILATOR` / `RV32M_VERILATOR_BIN_DIR` | `verilator` / — | Verilator binary / extra `PATH` entry |
+| `RV32M_GTKWAVE` | `gtkwave` | GTKWave binary |
+| `PDK_ROOT` | `~/.ciel` | IHP SG13G2 PDK (SRAM models, LibreLane) |
+| `LIBRELANE_VENV` | `~/.venv/librelane` | LibreLane Python venv |
+
+To override paths without editing tracked files, copy `scripts/open_rv.local.sh.example` to
+`scripts/open_rv.local.sh`. That copy is gitignored and is sourced after the defaults.
+
+## Simulation
 
 ```bash
-cd open_rv32m
-source scripts/open_rv.sh
+./scripts/run_case.sh tests/core/asm/loadstore.S               # one case → build/sim/soc/loadstore/
+./scripts/run_case.sh --vcd tests/core/asm/hazard.S            # + hazard.vcd
+./scripts/run_case.sh --pc-trace tests/core/asm/smoke.S        # + pc_trace.tsv (PC and WB columns)
+./scripts/run_case.sh --max-cycles 50000 tests/core/asm/muldiv.S
+RV32M_KEEP_BUILD=1 ./scripts/run_case.sh tests/core/asm/smoke.S   # keep the existing build dir
 ```
 
-After sourcing, **`scripts/` is on `PATH`**: you can run `run_case.sh`, `regress.sh`, `open_gtkwave.sh`, etc. without `./scripts/…`.
+- Each case directory holds the ELF, HEX, disassembly (`.dump`), `<case>.sim.log`, the
+  Verilator build (`verilator/obj_dir`) and an optional VCD / PC trace.
+- Tests end by storing to `tohost` at `0xF000_0000`: `1` means PASS, anything else FAIL.
+  `max_cycles` is only a watchdog.
+- `sim/Makefile` offers the same commands as shortcuts, e.g. `make -C sim run CASE=smoke VCD=1`,
+  `make -C sim regress`, `make -C sim gtkwave CASE=smoke`.
 
-When a case finishes, run **`t`** in the same shell to **`cd` into that case’s build directory** (ELF/HEX/log/VCD, etc.). The path is stored in `$RV32M_LAST_CASE_DIR_FILE` (default `$RV32M_ROOT/.open_rv32m_last_case_build_dir`).
+Details: [sim/SIM_README.md](sim/SIM_README.md), [docs/loading.md](docs/loading.md),
+[tests/core/README.md](tests/core/README.md).
 
-Edit the **Site defaults** block at the top of `scripts/open_rv.sh` for your machine (RISC-V toolchain, Verilator, Synopsys). No manual `export` is required before `source`. Optional: copy `scripts/open_rv.local.sh.example` → `scripts/open_rv.local.sh` (gitignored) to override without editing the tracked script.
-
-| Variable | Purpose |
-|----------|---------|
-| `RV32M_RISCV_TOOLCHAIN_BIN` | RISC-V `gcc`/`objdump` directory |
-| `RV32M_RISCV_GNU_PREFIX` | Tool prefix, e.g. `riscv64-unknown-elf-` |
-| `RV32M_VERILATOR` / `RV32M_VERILATOR_BIN_DIR` | Verilator (default sim) |
-| `PDK_ROOT` | IHP SG13G2 PDK root (SRAM macro models; LibreLane), default `~/.ciel` |
-| `RV32M_VCS_HOME` / `RV32M_VERDI_HOME` / `RV32M_DC_HOME` | Optional Synopsys tools |
-| `RV32M_SNPSLMD_LICENSE_FILE` | Synopsys license (if needed) |
+## Regression and performance
 
 ```bash
-export RV32M_RISCV_TOOLCHAIN_BIN=/home/ic/project/riscv_toolchain/bin
-export RV32M_VCS_HOME=/opt/synopsys/vcs/...
-source scripts/open_rv.sh
-```
-
-Legacy names `TOOLCHAIN`, `PREFIX`, `VCS_HOME` are still set automatically for existing scripts.
-
-If you keep a clone next to other projects and prefer to run **`source open_rv`** from the **parent** directory (e.g. `project/`), a thin **`open_rv`** there can forward to this script; the canonical file remains **`scripts/open_rv.sh`**.
-
-Equivalent from anywhere inside the tree:
-
-```bash
-source regress/env.sh
-```
-
-## Switching tools
-
-Always **`source scripts/open_rv.sh`** first so paths and `PATH` are set. Tool choice is then a mix of **environment variables** (session-wide) and **`run_case.sh` / `regress.sh` flags** (per run).
-
-### 1. RISC-V toolchain (compile asm tests)
-
-Set in `scripts/open_rv.local.sh` or export before `source`:
-
-```bash
-export RV32M_RISCV_TOOLCHAIN_BIN=/path/to/riscv/bin   # must contain ${PREFIX}gcc
-export RV32M_RISCV_GNU_PREFIX=riscv64-unknown-elf-    # or riscv32-unknown-elf-, riscv-none-embed-
-source scripts/open_rv.sh
-```
-
-Check: `command -v ${PREFIX}gcc` and `${PREFIX}gcc -march=rv32im -mabi=ilp32 --version`.
-
-### 2. HDL simulator (Verilator vs VCS)
-
-| Goal | One-shot (single case) | Whole shell session |
-|------|------------------------|---------------------|
-| **Verilator** (default, open source) | `./scripts/run_case.sh tests/core/asm/smoke.S` | `export RV32M_SIMULATOR=verilator` |
-| **VCS** (Synopsys) | `./scripts/run_case.sh --sim vcs tests/core/asm/smoke.S` | `export RV32M_SIMULATOR=vcs` |
-
-Point VCS/Verdi at your install before `source` (paths in [Environment](#environment)):
-
-```bash
-export RV32M_VCS_HOME=/opt/synopsys/vcs/...
-export RV32M_VERDI_HOME=/opt/synopsys/verdi/...
-export RV32M_SNPSLMD_LICENSE_FILE=27000@license-server
-source scripts/open_rv.sh
-```
-
-Verilator binary search order: `RV32M_VERILATOR` → optional `RV32M_VERILATOR_BIN_DIR` on `PATH` → system `verilator`.
-
-From `sim/Makefile`: `make run CASE=smoke SIM=verilator` or `make run CASE=smoke SIM=vcs`.
-
-### 3. DUT target (core vs AHB)
-
-| Target | Top module | Single case | Regression |
-|--------|------------|-------------|------------|
-| **soc** (default) | `torv_soc_top` / `tb_torv_soc` | `./scripts/run_case.sh tests/core/asm/smoke.S` | `./scripts/regress.sh` |
-
-Session default: `export RV32M_TARGET=ahb` (used by `run_case.sh` when `--target` is omitted).
-
-Makefile: `make run CASE=smoke` vs `make ahb CASE=sbus`, or `make regress TARGET=ahb`.
-
-### 4. Waveforms and debug
-
-| Output | Simulator | Command |
-|--------|-----------|---------|
-| **VCD** + GTKWave | Verilator or VCS | `./scripts/run_case.sh --vcd tests/core/asm/smoke.S` then `./scripts/open_gtkwave.sh smoke` |
-| **FSDB** + Verdi | **VCS only** | `./scripts/run_case.sh --sim vcs --fsdb tests/core/asm/hazard.S` |
-| **PC trace** TSV | either | `./scripts/run_case.sh --pc-trace tests/core/asm/smoke.S` |
-
-GTKWave: set `RV32M_GTKWAVE` if the binary is not named `gtkwave` on your `PATH`.
-
-After a VCS run: `cd build/sim/core/<case> && ./open_verdi.sh`.
-
-Regression with waves: `./scripts/regress.sh --waves` (VCD) or `./scripts/regress.sh --fsdb` (needs `--sim vcs` / `RV32M_SIMULATOR=vcs`).
-
-### 5. Synthesis (Design Compiler, optional)
-
-Not used for RTL sim. Requires `RV32M_DC_HOME` and `TSMC013_TARGET_LIB` (or your `.db`) in the environment, then:
-
-```bash
-source scripts/open_rv.sh
-make -C dc
-# or: ./scripts/dc_build.sh
-```
-
-### 6. Synthesis on IHP SG13G2 (LibreLane, open source)
-
-Same top (`rv32im_ahb_top`), RTL set and constraints as the DC flow, mapped to the IHP SG13G2 130 nm standard cells with Yosys, followed by OpenROAD pre-PnR STA on the slow/typ/fast corners. Runs inside the LibreLane 3.0.16 Docker image.
-
-Requires a LibreLane venv (default `~/.venv/librelane`), the `ihp-sg13g2` PDK under `PDK_ROOT` (default `~/.ciel`), and Docker usable without sudo. The repo must live under `$HOME` so the container can see it.
-
-```bash
-make -C librelane                              # or: ./scripts/ihp_synth.sh
-make -C librelane CLOCK_PERIOD=10 TAG=p10      # other clock target, separate run dir
-make -C librelane qor TAG=p10                  # re-print QoR of a run
-```
-
-Config: `librelane/config.yaml`, SDC: `librelane/constraints.sdc` (clock period comes from `CLOCK_PERIOD`, default 5 ns). Outputs under `librelane/runs/<tag>/`: netlist `final/nl/rv32im_ahb_top.nl.v`, cell report `06-yosys-synthesis/reports/stat.rpt`, timing `12-openroad-staprepnr/<corner>/max.rpt`.
-
-Pre-PnR timing has no placement or resizing, so treat it as an estimate.
-
-### Quick reference (copy-paste)
-
-```bash
-# Open-source flow (default)
-source scripts/open_rv.sh
-./scripts/run_case.sh --vcd tests/core/asm/smoke.S
-
-# VCS + FSDB + AHB
-export RV32M_SIMULATOR=vcs
-./scripts/run_case.sh --target ahb --fsdb tests/core/asm/sbus.S
-
-# Custom RISC-V toolchain for one session
-export RV32M_RISCV_TOOLCHAIN_BIN=$HOME/riscv/bin
-export RV32M_RISCV_GNU_PREFIX=riscv64-unknown-elf-
-source scripts/open_rv.sh
-./scripts/regress.sh --case alu
-```
-
-| Variable / flag | Values | Effect |
-|-----------------|--------|--------|
-| `RV32M_RISCV_TOOLCHAIN_BIN` | path to `bin` | Asm compile |
-| `RV32M_RISCV_GNU_PREFIX` | e.g. `riscv64-unknown-elf-` | Tool names |
-| `RV32M_SIMULATOR` / `--sim` | `verilator`, `vcs` | Simulator |
-| `RV32M_TARGET` / `--target` | `core`, `ahb` | DUT / TB |
-| `--vcd` / `--waves` | flag | VCD dump |
-| `--fsdb` | flag | FSDB (VCS) |
-| `--pc-trace` | flag | `pc_trace.tsv` |
-| `RV32M_VCS_HOME`, `RV32M_VERDI_HOME` | Synopsys roots | VCS/Verdi on `PATH` |
-
-## Primary entry points
-
-| Task | Command |
-|------|---------|
-| Single case | `./scripts/run_case.sh` |
-| Regression | `./scripts/regress.sh` |
-
-`sim/Makefile` and `tests/core/asm/Makefile` are optional shortcuts; they only invoke the same two scripts.
-
-## Single-case simulation
-
-```bash
-# Core DUT
-./scripts/run_case.sh tests/core/asm/smoke.S
-
-# AHB top
-./scripts/run_case.sh --target ahb tests/core/asm/sbus.S
-
-# VCD (GTKWave)
-./scripts/run_case.sh --vcd tests/core/asm/smoke.S
-./scripts/open_gtkwave.sh smoke
-
-# FSDB / Verdi (VCS only)
-./scripts/run_case.sh --sim vcs --fsdb tests/core/asm/hazard.S
-./scripts/run_case.sh --pc-trace tests/core/asm/smoke.S
-```
-
-Default build layout:
-
-```text
-build/sim/soc/<case>/
-```
-
-(`--target core|ahb` are aliases for the same SoC path.)
-
-To keep an existing build directory instead of wiping it:
-
-```bash
-RV32M_KEEP_BUILD=1 ./scripts/run_case.sh tests/core/asm/smoke.S
-```
-
-## Optional: `sim/Makefile` shortcuts
-
-The canonical commands are **`./scripts/run_case.sh`** and **`./scripts/regress.sh`**. From `sim/`, `make` only forwards to those scripts (same flags as environment variables):
-
-```bash
-cd sim
-make run CASE=smoke
-make ahb CASE=sbus
-make run CASE=smoke VCD=1
-make gtkwave CASE=smoke
-make regress
-make regress REGRESS_CASE=alu          # one case (passes --case alu)
-make regress                           # TORV SoC full list
-make list
-make env
-```
-
-Useful variables: `TARGET=soc` (default), `CASE=<asm stem>`, `ASM=<path.S>`, `SIM=verilator|vcs`, `FSDB=1`, `VCD=1`, `TRACE=1`, `PC_TRACE=1`, `MAX_CYCLES=N`, `BUILD_DIR=...`, `REGRESS_CASE=<name>`.
-
-`tests/core/asm/Makefile` is a tiny forwarder for **core** cases only; prefer `./scripts/run_case.sh` from the repo root.
-
-## Regression
-
-```bash
-./scripts/regress.sh                         # TORV SoC, regress/cases/soc.list (32 cases)
-./scripts/regress.sh --case alu
-./scripts/regress.sh --case-list regress/cases/deep_hazard.list   # hazard subset (6 cases)
-./scripts/regress.sh --waves                 # VCD per case
-./scripts/regress.sh --pc-trace              # pc_trace.tsv per case (includes WB columns)
-
-# After a regress run (or on latest regress/results/<stamp>/):
-./scripts/perf_summary.py
+./scripts/regress.sh                                        # regress/cases/soc.list (33 cases)
+./scripts/regress.sh --case alu --case muldiv
+./scripts/regress.sh --case-list regress/cases/deep_hazard.list
+./scripts/regress.sh --waves --pc-trace
+./scripts/check_hazard_dup_trace.py --case hazard_ibus_insn_dup --run
 ./scripts/perf_summary.py regress/results/<stamp> --csv perf.csv
 ```
 
-Case lists:
+Results go to `regress/results/<stamp>/`:
+- `summary.rpt`;
+- per-case directories;
+- `perf_summary.csv`, with cycles, instructions, IPC, instruction mix, stall/flush counts and
+  bus transfers.
 
-| List | Role |
-|------|------|
-| **`regress/cases/soc.list`** | **Canonical** full TORV regress (core asm + periph replay) |
-| `regress/cases/deep_hazard.list` | Directed hazard/replay subset (all entries ⊂ `soc.list`) |
-| `regress/cases/core.list` | Legacy (no periph); prefer `soc.list` |
+Representative cycle counts (v0.6):
 
-`--target core|ahb` selects legacy list files but runs the same TORV SoC simulator.
+| Case | Cycles | IPC |
+|------|--------|-----|
+| `perf_alu_chain` | 777 | 0.835 |
+| `perf_loadstore_loop` | 330 | 0.709 |
+| `perf_branch_loop` | 648 | 0.605 |
+| `perf_mul_loop` | 122 | 0.607 |
 
-Directed hazard checks (`tests/core/asm/<case>.plusargs`):
+## Physical implementation (IHP SG13G2, LibreLane)
 
-- `hazard_branch_mem_stall` — branch in EX while SBUS store stalls MEM
-- `hazard_ibus_store_dup` / `hazard_ibus_insn_dup` / `hazard_ibus_load_dup` — IBUS stall during MEM
-- `hazard_sbus_replay_smoke` / `hazard_sbus_rx_replay_smoke` — SBUS replay / UART RBR (`+replay_expect_rbr=1`)
+The implemented block is `rv32im_ahb_top`: the core plus its three AHB-Lite masters. The SoC
+SRAM macros and peripherals are not part of this block.
 
-Post-sim trace check (no waveform):
-
-```bash
-./scripts/check_hazard_dup_trace.py --case hazard_ibus_insn_dup --run
-./scripts/check_hazard_dup_trace.py --case hazard_ibus_load_dup --run
-```
-
-Future optimization ideas: [docs/TODO_LIST.md](docs/TODO_LIST.md).
-
-Focused lists: `regress/cases/deep_hazard.list`, `regress/cases/periph_replay.list`.
-
-Third-party IP for TORV SoC: `./scripts/fetch_ip.sh` (auto on first SoC sim). See [ip/README.md](ip/README.md), [tests/periph/README.md](tests/periph/README.md).
-
-Performance micro-benchmarks (also in the default list): `perf_alu_chain`, `perf_branch_loop`, `perf_loadstore_loop`, `perf_mul_loop`.
-
-## Test termination (tohost)
-
-Assembly tests signal PASS/FAIL by writing **`0xF000_0000`**:
-
-- `1` → PASS (`$finish` success)
-- any other value → FAIL
-
-`max_cycles` is only a watchdog.
-
-## Outputs
-
-Single case under `build/sim/soc/<case>/`: ELF, HEX, disassembly, log, optional VCD/FSDB, `pc_trace.tsv`, Verilator `obj_dir/` or VCS `simv`, helper `open_verdi.sh` when applicable.
-
-Regression under `regress/results/<timestamp>/`: `summary.rpt`, per-case trees mirroring the layout above.
-
-## Optional: Verdi
-
-From a case directory that already ran with VCS/FSDB or VCD:
+- Configuration: [librelane/config.yaml](librelane/config.yaml).
+  - Synthesis: slang frontend, ABC buffering, Booth multiplier.
+  - Implementation: post-global-route timing repair.
+  - Clock period: 10 ns.
+- Constraints: [librelane/constraints.sdc](librelane/constraints.sdc) — 2 ns input/output
+  delay budget, 0.3 ns setup uncertainty.
 
 ```bash
-cd build/sim/soc/smoke
-./open_verdi.sh
+make -C librelane                       # synth + pre-PnR STA → runs/synth
+make -C librelane flow                  # full flow → runs/flow (GDS, signoff)
+make -C librelane flow CLOCK_PERIOD=12.5 TAG=p12
+make -C librelane qor TAG=flow          # re-print a run's QoR
 ```
 
-Filelist: use `$RV32M_FILELIST_SOC` with top `tb_torv_soc`.
+Full-flow results at 10 ns (v0.6):
 
-## Optional: Design Compiler
+| Metric | Value |
+|--------|-------|
+| Std-cell area / die area | 266.7k µm² / 0.508 mm² (56% utilization) |
+| Setup WNS — typ 1.20 V / 25 °C | +2.35 ns |
+| Setup WNS — fast 1.32 V / −40 °C | +4.12 ns |
+| Setup WNS — slow 1.08 V / 125 °C | **−0.73 ns** (26 endpoints, mostly register → AHB address/control outputs) |
+| Hold | met at all corners |
+| Magic / KLayout DRC, Netgen LVS, antenna | clean |
 
-```bash
-make -C dc
-# or: ./scripts/dc_build.sh
-```
+At the slow corner the block runs at about 93 MHz under the 2 ns output-delay budget. The
+remaining paths and options to close them are listed in [docs/TODO_LIST.md](docs/TODO_LIST.md).
 
-See `dc/` for logs, reports, and mapped netlist paths (ignored from git by default).
+## Version history
+
+Each step is a tag on the main branch. `git checkout <tag>` or `git diff <tag-a> <tag-b>` shows
+the exact change.
+
+| Tag | Change |
+|-----|--------|
+| `v0.1-baseline` | Baseline before bus pipelining and the IHP flow (IPC ≈ 0.2) |
+| `v0.2-ibus-pipe` | Pipelined AHB-Lite instruction fetch (IPC up to ≈ 0.8) |
+| `v0.3-dbus-pipe` | Pipelined DBUS/SBUS: zero-wait loads and stores |
+| `v0.4-ihp-sram` | SoC memories on IHP SG13G2 SRAM macros (zero-wait wrapper) |
+| `v0.5-timing` | Slow-corner timing: AGU, two-cycle MUL, Booth, post-GRT repair |
+| `v0.6-fwd-reg` | Registered forwarding selects, pre-selected MEM/WB result |
+| `v0.7-open-flow` | Open-source-only repository, `make -C librelane flow`, documentation refresh |
+
+`docs/changelog/` contains the session notes.
+
+## Documentation
+
+- [docs/open_source_flow.md](docs/open_source_flow.md) — install the tools; simulation →
+  regression → synthesis → RTL-to-GDS → viewing results.
+- [spec/RV32IM_Current_Implementation.md](spec/RV32IM_Current_Implementation.md) —
+  microarchitecture (pipeline, hazards, buses, SoC).
+- [docs/torv_address_map.md](docs/torv_address_map.md) — address map.
+- [rtl/TORV.md](rtl/TORV.md) — SoC overview.
+- [sim/SIM_README.md](sim/SIM_README.md) — simulation reference.
+- [regress/README.md](regress/README.md) — regression.
+- [docs/loading.md](docs/loading.md) — program loading.
+- [tests/core/README.md](tests/core/README.md), [tests/periph/README.md](tests/periph/README.md) — tests.
+- [ip/README.md](ip/README.md) — third-party IP.
+- [docs/TODO_LIST.md](docs/TODO_LIST.md) — open items.
 
 ## License
 
-[LICENSE](LICENSE) is provided as **MIT** for open redistribution. If this core is derived from or must comply with another policy at your site, replace or supplement that file accordingly.
+[MIT](LICENSE). Third-party IP fetched into `ip/third_party/` keeps its own license
+([ip/README.md](ip/README.md)).

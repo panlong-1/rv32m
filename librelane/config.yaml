@@ -1,5 +1,6 @@
-# open_rv32m — LibreLane synthesis on IHP SG13G2 (open-source counterpart of dc/)
-# Same top and RTL set as dc/scripts/run_dc.tcl. Run: make -C librelane
+# open_rv32m — LibreLane on IHP SG13G2 (core + AHB masters, no SRAM macros).
+#   make -C librelane          synthesis + pre-PnR STA
+#   make -C librelane flow     full RTL-to-GDS + signoff
 meta:
   version: 3
   flow: Classic
@@ -7,7 +8,7 @@ meta:
 PDK: ihp-sg13g2
 DESIGN_NAME: rv32im_ahb_top
 
-# bus_if.sv is typedef-only and unused by this top (same as DC)
+# bus_if.sv is typedef-only and unused by this top
 VERILOG_FILES:
   - dir::../rtl/addr_decode.sv
   - dir::../rtl/pc_unit.sv
@@ -39,6 +40,9 @@ SYNTH_MUL_BOOTH: true
 RUN_POST_GRT_RESIZER_TIMING: true
 
 CLOCK_PORT: hclk
-CLOCK_PERIOD: 5.0
+# 100 MHz target: met at the typ/fast corners; the slow corner
+# (1.08 V / 125 C) is ~0.7 ns short on register-to-output paths (see
+# docs/open_source_flow.md)
+CLOCK_PERIOD: 10.0
 PNR_SDC_FILE: dir::constraints.sdc
 SIGNOFF_SDC_FILE: dir::constraints.sdc
