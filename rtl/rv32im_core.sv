@@ -302,7 +302,74 @@ module rv32im_core (
   logic [1:0] forward_a;
   logic [1:0] forward_b;
 
+  // Registered forwarding selects (timing: keeps the rd/rs compare out of the
+  // EX operand -> branch target / AGU -> AHB address-phase output paths).
+  // The selects are a function of ID/EX, EX/MEM and MEM/WB state only, so
+  // evaluating forwarding_unit on the next-state values of those fields and
+  // registering the result gives exactly the combinational selects.
+  logic       ex_mem_reg_write_d;
+  logic       ex_mem_mem_read_d;
+  logic [4:0] ex_mem_rd_d;
+  logic       mem_wb_reg_write_d;
+  logic [4:0] mem_wb_rd_d;
+  logic [4:0] id_ex_rs1_a_d;
+  logic [4:0] id_ex_rs2_a_d;
+  logic [1:0] forward_a_d;
+  logic [1:0] forward_b_d;
+
+  // Mirrors the ID/EX, EX/MEM and MEM/WB register update conditions below.
+  always_comb begin
+    id_ex_rs1_a_d = id_ex_rs1_a;
+    id_ex_rs2_a_d = id_ex_rs2_a;
+    if ((flush || bubble_id_ex) && !stall_id_ex) begin
+      id_ex_rs1_a_d = 5'd0;
+      id_ex_rs2_a_d = 5'd0;
+    end else if (!stall_id_ex) begin
+      id_ex_rs1_a_d = if_id_inst[19:15];
+      id_ex_rs2_a_d = if_id_inst[24:20];
+    end
+
+    ex_mem_reg_write_d = ex_mem_reg_write;
+    ex_mem_mem_read_d  = ex_mem_mem_read;
+    ex_mem_rd_d        = ex_mem_rd;
+    if (!stall_ex_mem) begin
+      ex_mem_reg_write_d = bubble_ex_mem ? 1'b0 : id_ex_reg_write;
+      ex_mem_mem_read_d  = bubble_ex_mem ? 1'b0 : id_ex_mem_read;
+      ex_mem_rd_d        = bubble_ex_mem ? 5'd0 : id_ex_rd;
+    end
+
+    mem_wb_reg_write_d = stall_mem_wb ? mem_wb_reg_write : ex_mem_reg_write;
+    mem_wb_rd_d        = stall_mem_wb ? mem_wb_rd        : ex_mem_rd;
+  end
+
   forwarding_unit u_fwd (
+    .ex_mem_regwrite(ex_mem_reg_write_d),
+    .ex_mem_memread(ex_mem_mem_read_d),
+    .ex_mem_rd(ex_mem_rd_d),
+    .mem_wb_regwrite(mem_wb_reg_write_d),
+    .mem_wb_rd(mem_wb_rd_d),
+    .id_ex_rs1(id_ex_rs1_a_d),
+    .id_ex_rs2(id_ex_rs2_a_d),
+    .forward_a(forward_a_d),
+    .forward_b(forward_b_d)
+  );
+
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      forward_a <= 2'b00;
+      forward_b <= 2'b00;
+    end else begin
+      forward_a <= forward_a_d;
+      forward_b <= forward_b_d;
+    end
+  end
+
+`ifndef SYNTHESIS
+  // Simulation check: the registered selects must equal the combinational
+  // forwarding decision on the current pipeline state.
+  logic [1:0] forward_a_chk;
+  logic [1:0] forward_b_chk;
+  forwarding_unit u_fwd_chk (
     .ex_mem_regwrite(ex_mem_reg_write),
     .ex_mem_memread(ex_mem_mem_read),
     .ex_mem_rd(ex_mem_rd),
@@ -310,14 +377,17 @@ module rv32im_core (
     .mem_wb_rd(mem_wb_rd),
     .id_ex_rs1(id_ex_rs1_a),
     .id_ex_rs2(id_ex_rs2_a),
-    .forward_a(forward_a),
-    .forward_b(forward_b)
+    .forward_a(forward_a_chk),
+    .forward_b(forward_b_chk)
   );
+  always @(posedge clk) begin
+    if (rst_n && (forward_a != forward_a_chk || forward_b != forward_b_chk))
+      $fatal(1, "registered forwarding select mismatch: a=%b/%b b=%b/%b",
+             forward_a, forward_a_chk, forward_b, forward_b_chk);
+  end
+`endif
 
-  logic [31:0] mem_wb_alu;
-  logic [31:0] mem_wb_mem;
-  logic [1:0]  mem_wb_wb_sel;
-  logic [31:0] mem_wb_pc_p4;
+  logic [31:0] mem_wb_result;
   logic [31:0] ex_mem_fwd_data;
 
   always_comb begin
@@ -550,29 +620,18 @@ module rv32im_core (
     if (!rst_n) begin
       mem_wb_reg_write <= 1'b0;
       mem_wb_rd        <= 5'd0;
-      mem_wb_alu       <= 32'd0;
-      mem_wb_mem       <= 32'd0;
-      mem_wb_wb_sel    <= 2'b00;
-      mem_wb_pc_p4     <= 32'd0;
+      mem_wb_result    <= 32'd0;
     // MEM always retires unless a bus wait state freezes the pipeline; the load
     // data phase completes in this same cycle.
     end else if (!stall_mem_wb) begin
       mem_wb_reg_write <= ex_mem_reg_write;
       mem_wb_rd        <= ex_mem_rd;
-      mem_wb_alu       <= ex_mem_alu;
-      mem_wb_mem       <= mem_load_data;
-      mem_wb_wb_sel    <= ex_mem_wb_sel;
-      mem_wb_pc_p4     <= ex_mem_pc_p4;
+      // Write-back select is resolved in MEM so WB forwarding is a plain
+      // register (timing: no wb_sel mux ahead of the EX operand muxes).
+      mem_wb_result    <= (ex_mem_wb_sel == 2'b01) ? mem_load_data : ex_mem_fwd_data;
     end
   end
 
-  always_comb begin
-    unique case (mem_wb_wb_sel)
-      2'b00: wb_wdata = mem_wb_alu;
-      2'b01: wb_wdata = mem_wb_mem;
-      2'b10: wb_wdata = mem_wb_pc_p4;
-      default: wb_wdata = mem_wb_alu;
-    endcase
-  end
+  assign wb_wdata = mem_wb_result;
 
 endmodule

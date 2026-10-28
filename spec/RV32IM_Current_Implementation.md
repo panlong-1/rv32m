@@ -244,10 +244,14 @@ Misaligned access exceptions are not implemented. The current logic selects byte
 - MEM/WB to EX when the MEM/WB instruction writes a matching register
 - `x0` is never forwarded as a writable destination
 
+The forwarding selects are registered: `rv32im_core` evaluates `forwarding_unit` on the next-state values of the ID/EX source fields and the EX/MEM and MEM/WB `rd`/write-enable fields, and registers `forward_a`/`forward_b`. This is cycle-identical to the combinational decision (a simulation-only check, `u_fwd_chk`, stops the run on any mismatch) and keeps the register-number compare out of the EX operand → branch target / AGU → AHB output paths. MEM/WB holds a single pre-selected `mem_wb_result` (load data, ALU result or PC+4, selected in MEM), so the WB forwarding source has no `wb_sel` mux.
+
+The load/store address comes from a dedicated AGU in EX (`fa_val + id_ex_imm`), not from the ALU. `MUL*` takes two EX cycles: operands are registered in the first, multiplied in the second.
+
 All three buses are pipelined AHB-Lite masters:
 
 - IBUS (`rv32im_ahb_fetch`): the core exports `ibus_next_addr = stall_pc ? pc : pc_next`, issued as the address phase; its data phase lines up with `pc` one cycle later (one fetch per cycle).
-- DBUS/SBUS (`rv32im_ahb_dport`): the address phase is issued from EX (`alu_y`, `addr_decode`, `lsu` in EX); the data phase is the MEM stage (store data from `ex_mem_store_data`, load data captured into MEM/WB). A zero-wait slave completes a load/store without stalling.
+- DBUS/SBUS (`rv32im_ahb_dport`): the address phase is issued from EX (AGU address, `addr_decode`, `lsu` in EX); the data phase is the MEM stage (store data from `ex_mem_store_data`, load data captured into MEM/WB). A zero-wait slave completes a load/store without stalling.
 - A request is presented only when the instruction leaves EX on the accepting edge, so each load/store is issued exactly once (no AHB/APB replay of UART THR/RBR side effects).
 - A data-bus request is presented only while the other data bus is ready, and a load/store in EX stalls while either data bus is not ready, so `bus_stall` does not depend on the EX address decode.
 
