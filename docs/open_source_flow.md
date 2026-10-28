@@ -221,6 +221,26 @@ klayout -l $PDK_ROOT/ihp-sg13g2/libs.tech/klayout/tech/sg13g2.lyp \
         librelane/runs/flow/final/gds/rv32im_ahb_top.gds
 ```
 
+To regenerate the README figures from a full run:
+
+```bash
+make -C librelane figures                      # from runs/flow
+make -C librelane figures TAG=full_p10_fwd \
+    HIST="v0.4=runs/full_p10 v0.5=runs/full_p10_booth v0.6=runs/full_p10_fwd"
+```
+
+This writes the following to `docs/img/`:
+
+| File | Content | Made by |
+|------|---------|---------|
+| `layout_full.png` | Whole layout | KLayout, run in the LibreLane image |
+| `layout_zoom.png` | 24 × 16 µm window at the die centre | KLayout, run in the LibreLane image |
+| `placement_modules.svg` | Cells coloured by RTL module | `figures/placement_map.py`, from the DEF |
+| `timing_area.svg` | Slow-corner WNS and area for each run in `HIST` | `figures/qor_charts.py`, from `metrics.json` |
+| `area_breakdown.svg` | Area by cell class | `figures/qor_charts.py`, from `metrics.json` |
+
+The architecture diagrams (`soc_arch.svg`, `pipeline.svg`) are drawn by hand.
+
 ## 7. Changing the design
 
 Typical loop for an RTL change:

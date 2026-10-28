@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 170" font-family="Helvetica,Arial,sans-serif" font-size="12">
+<style>
+.bg{fill:#fcfcfb}.t{fill:#0b0b0b}.s{fill:#52514e}.m{fill:#8a8984}.g{stroke:#e4e3de;stroke-width:1}
+.ax{stroke:#8a8984;stroke-width:1}.b{fill:#2a78d6}.z{stroke:#0b0b0b;stroke-width:1.2}
+@media (prefers-color-scheme:dark){.bg{fill:#1a1a19}.t{fill:#f0efec}.s{fill:#c3c2b7}.g{stroke:#33332f}.b{fill:#3987e5}.z{stroke:#f0efec}}
+</style>
+<rect class="bg" width="880" height="170"/>
+<text class="t" x="20" y="40" font-weight="bold">Setup WNS, slow corner (1.08 V, 125 °C)</text>
+<text class="s" x="20" y="73">v0.4-ihp-sram</text>
+<path class="b" d="M270.2,58 H144.0 Q140.0,58 140.0,62 V76 Q140.0,80 144.0,80 H270.2 Z"><title>v0.4-ihp-sram: -4.35 ns · 10 ns clock  (508 viol.)</title></path>
+<text class="t" x="276.2" y="73" text-anchor="start">-4.35  (508 viol.)</text>
+<text class="s" x="20" y="107">v0.5-timing</text>
+<path class="b" d="M270.2,92 H251.4 Q247.4,92 247.4,96 V110 Q247.4,114 251.4,114 H270.2 Z"><title>v0.5-timing: -0.76 ns · 10 ns clock  (38 viol.)</title></path>
+<text class="t" x="276.2" y="107" text-anchor="start">-0.76  (38 viol.)</text>
+<text class="s" x="20" y="141">v0.6-fwd-reg</text>
+<path class="b" d="M270.2,126 H252.5 Q248.5,126 248.5,130 V144 Q248.5,148 252.5,148 H270.2 Z"><title>v0.6-fwd-reg: -0.73 ns · 10 ns clock  (26 viol.)</title></path>
+<text class="t" x="276.2" y="141" text-anchor="start">-0.73  (26 viol.)</text>
+<line class="z" x1="270.2" y1="52" x2="270.2" y2="154"/>
+<text class="m" x="140" y="166" font-size="11">ns · 10 ns clock</text>
+<text class="t" x="470" y="40" font-weight="bold">Standard-cell area</text>
+<text class="s" x="470" y="73">v0.4-ihp-sram</text>
+<path class="b" d="M590.0,58 H744.3 Q748.3,58 748.3,62 V76 Q748.3,80 744.3,80 H590.0 Z"><title>v0.4-ihp-sram: 298.8 k µm²k</title></path>
+<text class="t" x="754.3" y="73" text-anchor="start">298.8k</text>
+<text class="s" x="470" y="107">v0.5-timing</text>
+<path class="b" d="M590.0,92 H733.4 Q737.4,92 737.4,96 V110 Q737.4,114 733.4,114 H590.0 Z"><title>v0.5-timing: 278.1 k µm²k</title></path>
+<text class="t" x="743.4" y="107" text-anchor="start">278.1k</text>
+<text class="s" x="470" y="141">v0.6-fwd-reg</text>
+<path class="b" d="M590.0,126 H727.3 Q731.3,126 731.3,130 V144 Q731.3,148 727.3,148 H590.0 Z"><title>v0.6-fwd-reg: 266.7 k µm²k</title></path>
+<text class="t" x="737.3" y="141" text-anchor="start">266.7k</text>
+<text class="m" x="590" y="166" font-size="11">k µm²</text>
+</svg>

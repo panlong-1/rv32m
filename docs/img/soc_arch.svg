@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 470" font-family="Helvetica,Arial,sans-serif" font-size="13">
+  <style>
+    .bg{fill:#fcfcfb}.t{fill:#0b0b0b}.s{fill:#52514e}
+    .blk{fill:#ffffff;stroke:#52514e;stroke-width:1.2}
+    .core{fill:#e8f1fc;stroke:#2a78d6;stroke-width:1.5}
+    .mst{fill:#fdf3d9;stroke:#c98500;stroke-width:1.2}
+    .mem{fill:#e4f6ee;stroke:#1baf7a;stroke-width:1.2}
+    .per{fill:#f3f0fc;stroke:#6250d6;stroke-width:1.2}
+    .tb{fill:none;stroke:#8a8984;stroke-width:1.2;stroke-dasharray:4 3}
+    .ll{fill:none;stroke:#2a78d6;stroke-width:1.5;stroke-dasharray:7 4}
+    .w{stroke:#52514e;stroke-width:2;fill:none}
+    @media (prefers-color-scheme:dark){
+      .bg{fill:#1a1a19}.t{fill:#f0efec}.s{fill:#c3c2b7}
+      .blk{fill:#242423;stroke:#c3c2b7}
+      .core{fill:#1d2c40;stroke:#3987e5}.mst{fill:#3a2f12;stroke:#c98500}
+      .mem{fill:#14332a;stroke:#199e70}.per{fill:#2a2648;stroke:#9085e9}
+      .ll{stroke:#3987e5}.w{stroke:#c3c2b7}
+    }
+  </style>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8a8984"/></marker></defs>
+  <rect class="bg" width="880" height="470"/>
+  <text class="t" x="20" y="28" font-size="16" font-weight="bold">TORV SoC (torv_soc_top)</text>
+
+  <rect class="ll" x="20" y="50" width="405" height="400" rx="8"/>
+  <text class="s" x="32" y="70" font-size="12">rv32im_ahb_top — the block implemented with LibreLane</text>
+
+  <rect class="core" x="38" y="85" width="170" height="345" rx="6"/>
+  <text class="t" x="123" y="112" text-anchor="middle" font-weight="bold">rv32im_core</text>
+  <g class="s" font-size="12" text-anchor="middle">
+    <text x="123" y="132">RV32IM, 5-stage</text>
+    <text x="123" y="150">IF ID EX MEM WB</text>
+    <text x="123" y="180">forwarding (reg. selects)</text>
+    <text x="123" y="198">hazard unit</text>
+    <text x="123" y="216">ALU · AGU</text>
+    <text x="123" y="234">MUL 2-cycle (Booth)</text>
+    <text x="123" y="252">DIV/REM iterative</text>
+    <text x="123" y="270">32×32 register file</text>
+    <text x="123" y="300">addr_decode in EX:</text>
+    <text x="123" y="318">0x4… and 0xF… → SBUS</text>
+    <text x="123" y="336">everything else → DBUS</text>
+  </g>
+
+  <rect class="mst" x="235" y="95" width="172" height="70" rx="6"/>
+  <text class="t" x="321" y="122" text-anchor="middle" font-weight="bold">rv32im_ahb_fetch</text>
+  <text class="s" x="321" y="142" text-anchor="middle" font-size="12">IBUS · 1 fetch / cycle</text>
+
+  <rect class="mst" x="235" y="215" width="172" height="70" rx="6"/>
+  <text class="t" x="321" y="242" text-anchor="middle" font-weight="bold">rv32im_ahb_dport</text>
+  <text class="s" x="321" y="262" text-anchor="middle" font-size="12">DBUS · addr EX, data MEM</text>
+
+  <rect class="mst" x="235" y="335" width="172" height="70" rx="6"/>
+  <text class="t" x="321" y="362" text-anchor="middle" font-weight="bold">rv32im_ahb_dport</text>
+  <text class="s" x="321" y="382" text-anchor="middle" font-size="12">SBUS · addr EX, data MEM</text>
+
+  <path class="w" d="M208,130 H235"/><path class="w" d="M208,250 H235"/><path class="w" d="M208,370 H235"/>
+
+  <path class="w" d="M407,130 H535" marker-end="url(#a)"/>
+  <path class="w" d="M407,250 H535" marker-end="url(#a)"/>
+  <path class="w" d="M407,370 H480" marker-end="url(#a)"/>
+  <g class="s" font-size="12" text-anchor="middle">
+    <text x="478" y="122">IBUS AHB-Lite</text>
+    <text x="478" y="242">DBUS AHB-Lite</text>
+    <text x="452" y="362">SBUS</text>
+  </g>
+
+  <rect class="mem" x="535" y="95" width="210" height="70" rx="6"/>
+  <text class="t" x="640" y="122" text-anchor="middle" font-weight="bold">I-SRAM · 0x0000_0000</text>
+  <text class="s" x="640" y="142" text-anchor="middle" font-size="12">torv_ahb_sram, 4 KiB IHP macro</text>
+
+  <rect class="mem" x="535" y="215" width="210" height="70" rx="6"/>
+  <text class="t" x="640" y="242" text-anchor="middle" font-weight="bold">D-SRAM · 0x2000_0000</text>
+  <text class="s" x="640" y="262" text-anchor="middle" font-size="12">torv_ahb_sram, 4 KiB IHP macro</text>
+
+  <rect class="blk" x="480" y="320" width="44" height="100" rx="4"/>
+  <text class="t" x="502" y="366" text-anchor="middle" font-size="12">SBUS</text>
+  <text class="t" x="502" y="382" text-anchor="middle" font-size="12">mux</text>
+  <path class="w" d="M524,340 H560" marker-end="url(#a)"/>
+  <path class="w" d="M524,404 H560" marker-end="url(#a)"/>
+
+  <rect class="mem" x="560" y="312" width="150" height="56" rx="6"/>
+  <text class="t" x="635" y="335" text-anchor="middle" font-weight="bold">S-SRAM</text>
+  <text class="s" x="635" y="354" text-anchor="middle" font-size="12">0x4000_0000 · 4 KiB</text>
+
+  <rect class="per" x="560" y="378" width="150" height="56" rx="6"/>
+  <text class="t" x="635" y="401" text-anchor="middle" font-weight="bold">AHB→APB bridge</text>
+  <text class="s" x="635" y="420" text-anchor="middle" font-size="12">0x4000_1000</text>
+  <path class="w" d="M710,406 H740" marker-end="url(#a)"/>
+  <rect class="per" x="740" y="378" width="120" height="56" rx="6"/>
+  <text class="t" x="800" y="401" text-anchor="middle" font-weight="bold">UART</text>
+  <text class="s" x="800" y="420" text-anchor="middle" font-size="12">apb_uart_sv</text>
+
+  <rect class="tb" x="740" y="312" width="120" height="56" rx="6"/>
+  <text class="s" x="800" y="335" text-anchor="middle" font-size="12">tohost 0xF000_0000</text>
+  <text class="s" x="800" y="353" text-anchor="middle" font-size="12">testbench only</text>
+  <path class="w" d="M502,320 V298 H800 V312" stroke-dasharray="4 3" marker-end="url(#a)"/>
+</svg>

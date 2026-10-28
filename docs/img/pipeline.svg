@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 480" font-family="Helvetica,Arial,sans-serif" font-size="12">
+  <style>
+    .bg{fill:#fcfcfb}.t{fill:#0b0b0b}.s{fill:#52514e}
+    .st{fill:#f1f0ec;stroke:none}
+    .u{fill:#ffffff;stroke:#52514e;stroke-width:1.2}
+    .pr{fill:#2a78d6}
+    .ex{fill:#fdf3d9;stroke:#c98500;stroke-width:1.2}
+    .bus{fill:#e4f6ee;stroke:#1baf7a;stroke-width:1.2}
+    .w{stroke:#52514e;stroke-width:1.6;fill:none}
+    .fw{stroke:#eb6834;stroke-width:1.8;fill:none}
+    .br{stroke:#6250d6;stroke-width:1.8;fill:none;stroke-dasharray:6 3}
+    .fwt{fill:#c2501f}.brt{fill:#6250d6}
+    @media (prefers-color-scheme:dark){
+      .bg{fill:#1a1a19}.t{fill:#f0efec}.s{fill:#c3c2b7}.st{fill:#242423}
+      .u{fill:#2c2c2a;stroke:#c3c2b7}.pr{fill:#3987e5}
+      .ex{fill:#3a2f12;stroke:#c98500}.bus{fill:#14332a;stroke:#199e70}
+      .w{stroke:#c3c2b7}.fw{stroke:#d95926}.br{stroke:#9085e9}
+      .fwt{fill:#e8865c}.brt{fill:#9085e9}
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8a8984"/></marker>
+  </defs>
+  <rect class="bg" width="920" height="480"/>
+  <text class="t" x="20" y="26" font-size="16" font-weight="bold">rv32im_core pipeline</text>
+
+  <!-- stage bands -->
+  <rect class="st" x="20"  y="95" width="140" height="300" rx="6"/>
+  <rect class="st" x="195" y="95" width="190" height="300" rx="6"/>
+  <rect class="st" x="420" y="95" width="210" height="300" rx="6"/>
+  <rect class="st" x="665" y="95" width="130" height="300" rx="6"/>
+  <rect class="st" x="830" y="95" width="75"  height="300" rx="6"/>
+  <g class="t" font-weight="bold" font-size="14" text-anchor="middle">
+    <text x="90" y="118">IF</text><text x="290" y="118">ID</text><text x="525" y="118">EX</text>
+    <text x="730" y="118">MEM</text><text x="867" y="118">WB</text>
+  </g>
+
+  <!-- pipeline registers -->
+  <rect class="pr" x="171" y="95" width="12" height="300" rx="2"/>
+  <rect class="pr" x="396" y="95" width="12" height="300" rx="2"/>
+  <rect class="pr" x="641" y="95" width="12" height="300" rx="2"/>
+  <rect class="pr" x="806" y="95" width="12" height="300" rx="2"/>
+  <g class="s" font-size="11" text-anchor="middle">
+    <text x="177" y="412">IF/ID</text><text x="402" y="412">ID/EX</text>
+    <text x="647" y="412">EX/MEM</text><text x="812" y="412">MEM/WB</text>
+  </g>
+
+  <!-- IF -->
+  <rect class="u" x="35" y="135" width="110" height="40" rx="4"/>
+  <text class="t" x="90" y="160" text-anchor="middle">pc_unit</text>
+  <rect class="bus" x="35" y="195" width="110" height="56" rx="4"/>
+  <text class="t" x="90" y="218" text-anchor="middle">ahb_fetch</text>
+  <text class="s" x="90" y="236" text-anchor="middle" font-size="11">IBUS, pipelined</text>
+  <path class="w" d="M90,175 V195" marker-end="url(#a)"/>
+
+  <!-- ID -->
+  <rect class="u" x="210" y="135" width="75" height="40" rx="4"/>
+  <text class="t" x="247" y="160" text-anchor="middle">decoder</text>
+  <rect class="u" x="295" y="135" width="75" height="40" rx="4"/>
+  <text class="t" x="332" y="160" text-anchor="middle">imm_gen</text>
+  <rect class="u" x="210" y="190" width="160" height="40" rx="4"/>
+  <text class="t" x="290" y="215" text-anchor="middle">regfile 32×32 (2R/1W)</text>
+  <rect class="u" x="210" y="245" width="160" height="48" rx="4"/>
+  <text class="t" x="290" y="265" text-anchor="middle">forwarding_unit</text>
+  <text class="s" x="290" y="282" text-anchor="middle" font-size="11">selects computed in ID, registered</text>
+  <rect class="u" x="210" y="308" width="160" height="48" rx="4"/>
+  <text class="t" x="290" y="328" text-anchor="middle">hazard_unit</text>
+  <text class="s" x="290" y="345" text-anchor="middle" font-size="11">load-use bubble · bus stall</text>
+
+  <!-- EX -->
+  <rect class="u" x="435" y="135" width="80" height="40" rx="4"/>
+  <text class="t" x="475" y="160" text-anchor="middle">fwd mux</text>
+  <rect class="u" x="530" y="135" width="85" height="40" rx="4"/>
+  <text class="t" x="572" y="160" text-anchor="middle">ALU / branch</text>
+  <path class="w" d="M515,155 H530" marker-end="url(#a)"/>
+  <rect class="ex" x="435" y="190" width="180" height="48" rx="4"/>
+  <text class="t" x="525" y="210" text-anchor="middle">muldiv_unit</text>
+  <text class="s" x="525" y="227" text-anchor="middle" font-size="11">MUL 2 cycles (Booth) · DIV ≈34</text>
+  <rect class="u" x="435" y="253" width="80" height="40" rx="4"/>
+  <text class="t" x="475" y="278" text-anchor="middle">AGU</text>
+  <rect class="u" x="530" y="253" width="85" height="40" rx="4"/>
+  <text class="t" x="572" y="270" text-anchor="middle">addr_decode</text>
+  <text class="t" x="572" y="286" text-anchor="middle">+ LSU</text>
+  <path class="w" d="M515,273 H530" marker-end="url(#a)"/>
+
+  <!-- MEM -->
+  <rect class="bus" x="678" y="235" width="105" height="76" rx="4"/>
+  <text class="t" x="730" y="258" text-anchor="middle">ahb_dport ×2</text>
+  <text class="s" x="730" y="276" text-anchor="middle" font-size="11">DBUS / SBUS</text>
+  <text class="s" x="730" y="292" text-anchor="middle" font-size="11">data phase,</text>
+  <text class="s" x="730" y="305" text-anchor="middle" font-size="11">load align</text>
+  <path class="w" d="M615,273 H628 V333 H730 V311" marker-end="url(#a)"/>
+  <text class="s" x="662" y="350" font-size="11">addr phase from EX</text>
+
+  <!-- WB -->
+  <rect class="u" x="838" y="190" width="60" height="60" rx="4"/>
+  <text class="t" x="868" y="216" text-anchor="middle">result</text>
+  <text class="t" x="868" y="232" text-anchor="middle">select</text>
+  <path class="w" d="M783,273 H826 V230 H838" marker-end="url(#a)"/>
+  <path class="w" d="M868,250 V378 H380 V210 H370" marker-end="url(#a)"/>
+  <text class="s" x="560" y="373" text-anchor="middle" font-size="11">register write-back</text>
+
+  <!-- lanes above the stages -->
+  <path class="br" d="M590,135 V50 H120 V135" marker-end="url(#a)"/>
+  <text class="brt" x="300" y="44" text-anchor="middle" font-size="11">taken branch / jump resolved in EX → redirect PC (2-cycle penalty)</text>
+  <path class="fw" d="M812,95 V66 H460 V135" marker-end="url(#a)"/>
+  <path class="fw" d="M647,95 V80 H490 V135" marker-end="url(#a)"/>
+  <text class="fwt" x="700" y="62" font-size="11">MEM/WB → EX</text>
+  <text class="fwt" x="498" y="92" font-size="11">EX/MEM → EX</text>
+
+  <g font-size="11">
+    <rect class="pr" x="20" y="430" width="12" height="12" rx="2"/><text class="s" x="38" y="440">pipeline register</text>
+    <path class="fw" d="M150,436 H180"/><text class="s" x="186" y="440">forwarding path</text>
+    <path class="br" d="M300,436 H330"/><text class="s" x="336" y="440">PC redirect</text>
+    <rect class="bus" x="430" y="430" width="14" height="12"/><text class="s" x="450" y="440">AHB-Lite master</text>
+    <rect class="ex" x="560" y="430" width="14" height="12"/><text class="s" x="580" y="440">multi-cycle unit</text>
+    <text class="s" x="20" y="466">Load-use: one bubble. Zero-wait loads/stores never stall; MUL adds one cycle; DIV stalls EX until done.</text>
+  </g>
+</svg>

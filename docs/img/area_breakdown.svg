@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 272" font-family="Helvetica,Arial,sans-serif" font-size="12">
+<style>
+.bg{fill:#fcfcfb}.t{fill:#0b0b0b}.s{fill:#52514e}.m{fill:#8a8984}.g{stroke:#e4e3de;stroke-width:1}
+.ax{stroke:#8a8984;stroke-width:1}.b{fill:#2a78d6}.z{stroke:#0b0b0b;stroke-width:1.2}
+@media (prefers-color-scheme:dark){.bg{fill:#1a1a19}.t{fill:#f0efec}.s{fill:#c3c2b7}.g{stroke:#33332f}.b{fill:#3987e5}.z{stroke:#f0efec}}
+</style>
+<rect class="bg" width="660" height="272"/>
+<text class="t" x="20" y="40" font-weight="bold">v0.6-fwd-reg standard-cell area by class (total 266.7k µm², 18824 cells)</text>
+<text class="s" x="20" y="73">Combinational logic</text>
+<path class="b" d="M140.0,58 H443.1 Q447.1,58 447.1,62 V76 Q447.1,80 443.1,80 H140.0 Z"><title>Combinational logic: 144.0 k µm²k  · 12783 cells</title></path>
+<text class="t" x="453.1" y="73" text-anchor="start">144.0k  · 12783 cells</text>
+<text class="s" x="20" y="107">Flip-flops</text>
+<path class="b" d="M140.0,92 H314.2 Q318.2,92 318.2,96 V110 Q318.2,114 314.2,114 H140.0 Z"><title>Flip-flops: 83.5 k µm²k  · 1704 cells</title></path>
+<text class="t" x="324.2" y="107" text-anchor="start">83.5k  · 1704 cells</text>
+<text class="s" x="20" y="141">Timing-repair buffers</text>
+<path class="b" d="M140.0,126 H177.7 Q181.7,126 181.7,130 V144 Q181.7,148 177.7,148 H140.0 Z"><title>Timing-repair buffers: 19.5 k µm²k  · 2137 cells</title></path>
+<text class="t" x="187.7" y="141" text-anchor="start">19.5k  · 2137 cells</text>
+<text class="s" x="20" y="175">Buffers</text>
+<path class="b" d="M140.0,160 H156.3 Q160.3,160 160.3,164 V178 Q160.3,182 156.3,182 H140.0 Z"><title>Buffers: 9.5 k µm²k  · 1220 cells</title></path>
+<text class="t" x="166.3" y="175" text-anchor="start">9.5k  · 1220 cells</text>
+<text class="s" x="20" y="209">Clock tree</text>
+<path class="b" d="M140.0,194 H149.5 Q153.5,194 153.5,198 V212 Q153.5,216 149.5,216 H140.0 Z"><title>Clock tree: 6.3 k µm²k  · 295 cells</title></path>
+<text class="t" x="159.5" y="209" text-anchor="start">6.3k  · 295 cells</text>
+<text class="s" x="20" y="243">Inverters</text>
+<path class="b" d="M140.0,228 H143.9 Q147.9,228 147.9,232 V246 Q147.9,250 143.9,250 H140.0 Z"><title>Inverters: 3.7 k µm²k  · 673 cells</title></path>
+<text class="t" x="153.9" y="243" text-anchor="start">3.7k  · 673 cells</text>
+<text class="m" x="140" y="268" font-size="11">k µm²</text>
+</svg>

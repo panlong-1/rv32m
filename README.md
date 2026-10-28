@@ -38,6 +38,32 @@ No commercial EDA tool or proprietary PDK is needed. Step-by-step instructions a
 - **Implementation:** `rv32im_ahb_top` closes DRC, LVS and antenna checks at 10 ns
   (results below).
 
+## Architecture
+
+![TORV SoC block diagram](docs/img/soc_arch.svg)
+
+The core is a Harvard machine with three AHB-Lite masters. `addr_decode` (in EX) sends
+`0x4xxx_xxxx` and `0xFxxx_xxxx` to SBUS and everything else to DBUS. The dashed box is
+`rv32im_ahb_top`, the block that goes through LibreLane. The SRAM macros, the SBUS mux,
+the APB bridge and the UART sit at SoC level.
+
+![rv32im_core pipeline](docs/img/pipeline.svg)
+
+- **IF:** `pc_unit` and the pipelined fetch master; one instruction per cycle from a
+  zero-wait slave.
+- **ID:** decode, immediate generation, register-file read, and the hazard unit.
+  - The forwarding selects for the next EX are computed here, from next-state pipeline
+    values, and registered. EX therefore only drives the operand mux.
+- **EX:**
+  - operand forwarding (from EX/MEM and MEM/WB);
+  - ALU and branch resolution (a taken branch or jump costs 2 cycles);
+  - the multiply/divide unit;
+  - the AGU, `addr_decode` and LSU, which issue the AHB address phase.
+- **MEM:** the AHB data phase and load alignment. The MEM/WB result is selected before the
+  register, so WB is a plain write.
+
+Details: [spec/RV32IM_Current_Implementation.md](spec/RV32IM_Current_Implementation.md).
+
 ## Repository layout
 
 | Path | Contents |
@@ -49,9 +75,9 @@ No commercial EDA tool or proprietary PDK is needed. Step-by-step instructions a
 | `regress/` | Regression driver and case lists ([README](regress/README.md)) |
 | `scripts/` | `open_rv.sh` environment, `run_case.sh`, `regress.sh`, Verilator build, waveform/trace/perf helpers |
 | `ip/` | Third-party IP filelist; sources are fetched into `ip/third_party/` ([README](ip/README.md)) |
-| `librelane/` | LibreLane config, SDC, `Makefile` (`synth`, `flow`), `qor.py` |
+| `librelane/` | LibreLane config, SDC, `Makefile` (`synth`, `flow`, `figures`), `qor.py`, `figures/` (layout and QoR plot scripts) |
 | `spec/` | [RV32IM_Current_Implementation.md](spec/RV32IM_Current_Implementation.md) — microarchitecture reference |
-| `docs/` | Open-source flow, address map, loading, TODO, changelog, bug notes |
+| `docs/` | Open-source flow, address map, loading, TODO, changelog, bug notes; `img/` holds the README figures |
 
 ## Prerequisites
 
@@ -181,21 +207,71 @@ make -C librelane                       # synth + pre-PnR STA → runs/synth
 make -C librelane flow                  # full flow → runs/flow (GDS, signoff)
 make -C librelane flow CLOCK_PERIOD=12.5 TAG=p12
 make -C librelane qor TAG=flow          # re-print a run's QoR
+make -C librelane figures               # layout PNGs, placement map, QoR charts → docs/img
 ```
 
-Full-flow results at 10 ns (v0.6):
+### Results at 10 ns (v0.6 RTL, unchanged in v0.7)
 
-| Metric | Value |
-|--------|-------|
-| Std-cell area / die area | 266.7k µm² / 0.508 mm² (56% utilization) |
+| Area and layout | Value |
+|-----------------|-------|
+| Die | 703.6 × 722.4 µm = 0.508 mm² |
+| Std-cell area / utilization | 266.7k µm² / 55.7% |
+| Std cells (excl. fill/tap) | 18,824, of which 1,704 flip-flops |
+| Clock tree | 213 buffers + 82 inverters; setup skew 0.34 ns |
+| Timing repair | 2,137 resizer buffers, 276 setup buffers, 10 hold buffers |
+| Routing | 1.01 m of wire, 134,525 vias, 0 DRC after 6 detailed-route iterations |
+| Antenna | 12 diodes inserted, 0 violating nets |
+| Power-grid IR drop | 7.9 mV worst (VPWR), 0.17 mV average |
+| Power (estimate) | 13.7 mW: 11.2 mW internal, 2.5 mW switching, 15 µW leakage (default activity, not from simulation) |
+
+| Timing and signoff | Value |
+|--------------------|-------|
 | Setup WNS — typ 1.20 V / 25 °C | +2.35 ns |
 | Setup WNS — fast 1.32 V / −40 °C | +4.12 ns |
-| Setup WNS — slow 1.08 V / 125 °C | **−0.73 ns** (26 endpoints, mostly register → AHB address/control outputs) |
-| Hold | met at all corners |
-| Magic / KLayout DRC, Netgen LVS, antenna | clean |
+| Setup WNS — slow 1.08 V / 125 °C | **−0.73 ns**, TNS −7.85 ns, 26 endpoints (24 register → AHB address/control outputs, 2 register-to-register at −0.08 ns) |
+| Hold | met at all corners (worst +0.10 ns) |
+| Magic / KLayout DRC, Netgen LVS, XOR, antenna | clean |
 
-At the slow corner the block runs at about 93 MHz under the 2 ns output-delay budget. The
-remaining paths and options to close them are listed in [docs/TODO_LIST.md](docs/TODO_LIST.md).
+At the slow corner, the block runs at about 93 MHz under the 2 ns output-delay budget.
+[docs/TODO_LIST.md](docs/TODO_LIST.md) lists the remaining paths and the options for
+closing them.
+
+![Slow-corner WNS and area by version](docs/img/timing_area.svg)
+
+![Std-cell area by cell class](docs/img/area_breakdown.svg)
+
+### Layout
+
+<table>
+<tr>
+<td width="50%"><img src="docs/img/layout_full.png" alt="Final layout of rv32im_ahb_top"></td>
+<td width="50%"><img src="docs/img/placement_modules.svg" alt="Placement by module"></td>
+</tr>
+<tr>
+<td>Final GDS (KLayout, IHP layer colours), 704 × 722 µm.</td>
+<td>Where each module's cells are placed.</td>
+</tr>
+</table>
+
+How the placement map is built:
+
+- After synthesis the netlist is flat, so flip-flops keep their RTL register names but
+  logic cells do not.
+- Each flip-flop is labelled from its register name.
+- Each logic cell takes the label of the nearest labelled flip-flop through the netlist,
+  so the boundaries are approximate.
+
+What the map shows:
+
+- The register file (bottom left) and the multiplier/divider (right) take most of the
+  area.
+- The pipeline registers and the AHB masters sit along the top edge, where most of the I/O
+  pins are.
+
+![Layout detail, 24 × 16 µm at the die centre](docs/img/layout_zoom.png)
+
+*A 24 × 16 µm window at the die centre: standard-cell rows, metal routing and power
+rails.*
 
 ## Version history
 
