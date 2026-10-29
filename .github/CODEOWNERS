@@ -1,0 +1,5 @@
+# Default reviewers for everything in the repository
+* @semitov/asic-task-force-maintainers
+
+# Until the repository is transferred to the semitov organization, team handles cannot be
+# resolved here; GitHub falls back to repository admins.

@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # Same versions as docs/open_source_flow.md
+  IHP_PDK_VERSION: c4b8b4e5e7a05f375cca3815d51b3a37721fbf5c
+  CIEL_VERSION: 2.6.1
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Verilator
+        run: sudo apt-get update && sudo apt-get install -y verilator
+      - name: Lint torv_cpu (hardened block)
+        run: ./scripts/lint.sh
+
+  regress:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y verilator gcc-riscv64-unknown-elf
+          pipx install "ciel==${CIEL_VERSION}"
+      - name: Cache IHP PDK
+        uses: actions/cache@v4
+        with:
+          path: ~/.ciel
+          key: ihp-sg13g2-${{ env.IHP_PDK_VERSION }}
+      - name: Install IHP SG13G2 PDK (SRAM models)
+        run: ~/.local/bin/ciel enable --pdk-family ihp-sg13g2 "${IHP_PDK_VERSION}"
+      - name: Fetch third-party IP
+        run: ./scripts/fetch_ip.sh
+      - name: Regression
+        run: |
+          source scripts/env.sh
+          ./scripts/regress.sh
+      - name: Summary
+        if: always()
+        run: |
+          rpt=$(ls -d regress/results/*/ 2>/dev/null | tail -1)
+          if [ -n "$rpt" ] && [ -f "$rpt/summary.rpt" ]; then
+            { echo '```'; cat "$rpt/summary.rpt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regress-results
+          path: regress/results/
+          retention-days: 14
