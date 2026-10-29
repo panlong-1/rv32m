@@ -36,7 +36,8 @@ jobs:
           path: ~/.ciel
           key: ihp-sg13g2-${{ env.IHP_PDK_VERSION }}
       - name: Install IHP SG13G2 PDK (SRAM models)
-        run: ~/.local/bin/ciel enable --pdk-family ihp-sg13g2 "${IHP_PDK_VERSION}"
+        # pipx puts ciel on PATH (PIPX_BIN_DIR differs between runners and local machines)
+        run: ciel enable --pdk-family ihp-sg13g2 "${IHP_PDK_VERSION}"
       - name: Fetch third-party IP
         run: ./scripts/fetch_ip.sh
       - name: Regression
