@@ -1,4 +1,4 @@
-# rv32m simulation
+# TORV simulation
 
 All simulation is **Verilator** on the TORV SoC testbench `sim/tb_torv_soc.sv`. There are two
 entry points:

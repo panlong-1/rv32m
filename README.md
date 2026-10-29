@@ -1,7 +1,9 @@
-# rv32m
+# TORV
 
-Open-source **RV32I + M-extension** five-stage in-order core and the **TORV** SoC
-(**T**orino **O**pen **R**ISC-**V**), with a fully open-source flow from RTL to GDS:
+**TORV** (**T**orino **O**pen **R**ISC-**V**) is an open-source **RV32I + M-extension**
+five-stage in-order core and SoC, with a fully open-source flow from RTL to GDS. It is
+developed by the ASIC Task Force of [SemiTO-V](https://semitov.github.io), the RISC-V
+student team at Politecnico di Torino.
 
 - **Simulation:** Verilator + GTKWave, directed RISC-V assembly tests, self-checking
   testbench, regression and performance counters.
@@ -304,6 +306,15 @@ the exact change.
 - [tests/core/README.md](tests/core/README.md), [tests/periph/README.md](tests/periph/README.md) — tests.
 - [ip/README.md](ip/README.md) — third-party IP.
 - [docs/TODO_LIST.md](docs/TODO_LIST.md) — open items.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow, commit format and RTL conventions, and
+[CHANGELOG.md](CHANGELOG.md) for release notes. Maintainers:
+`@semitov/asic-task-force-maintainers`.
+
+This project was called `rv32m` before v0.8.0; tags `v0.1-baseline` to `v0.7.1-readme-figs`
+use the old module and variable names (mapping in [CHANGELOG.md](CHANGELOG.md#080)).
 
 ## License
 

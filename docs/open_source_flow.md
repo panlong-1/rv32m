@@ -1,6 +1,6 @@
 # Open-source flow: RTL → simulation → GDS
 
-This guide takes rv32m from a fresh Linux machine to a regression run and a signed-off GDS of
+This guide takes TORV from a fresh Linux machine to a regression run and a signed-off GDS of
 `torv_cpu` on IHP SG13G2. Every tool in it is open source.
 
 ```text

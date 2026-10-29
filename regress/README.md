@@ -1,4 +1,4 @@
-# rv32m regression
+# TORV regression
 
 ## Entry point
 

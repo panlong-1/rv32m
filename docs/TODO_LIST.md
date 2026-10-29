@@ -1,4 +1,4 @@
-# rv32m backlog
+# TORV backlog
 
 Open items as of `v0.7-open-flow`. Completed items are kept at the end for reference.
 
