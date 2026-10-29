@@ -76,8 +76,8 @@ KLayout is only for viewing the GDS on the host. DRC and LVS run inside the Libr
 ## 2. Environment
 
 ```bash
-git clone https://github.com/panlong-1/rv32m.git ~/project/rv32m
-cd ~/project/rv32m
+git clone https://github.com/semitov/torv.git ~/project/torv
+cd ~/project/torv
 source scripts/env.sh
 ```
 

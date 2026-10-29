@@ -108,8 +108,8 @@ The IHP PDK is needed **for simulation as well**, because the SoC SRAMs use the 
 ## Quick start
 
 ```bash
-git clone https://github.com/panlong-1/rv32m.git
-cd rv32m
+git clone https://github.com/semitov/torv.git
+cd torv
 source scripts/env.sh                        # paths, PATH, PDK_ROOT; prints what it found
 
 ./scripts/run_case.sh tests/core/asm/smoke.S     # one test (fetches third-party IP on first run)
