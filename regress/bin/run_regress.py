@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""open_rv32m regression driver.
+"""TORV regression driver.
 
 This follows the same high-level model as wujian100_open/tools/run_case:
 clean/create a work area, compile software cases, build the simulator,
@@ -56,7 +56,7 @@ def load_cases(path):
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run open_rv32m regression (Verilator)")
+    parser = argparse.ArgumentParser(description="Run TORV regression (Verilator)")
     parser.add_argument("--target", choices=["core", "ahb", "soc"], default="soc")
     parser.add_argument(
         "--sim",
@@ -115,13 +115,13 @@ def main() -> int:
     summary: list[tuple[str, str, str]] = []
 
     if args.waves:
-        env["RV32M_WAVE_VCD"] = "1"
+        env["TORV_WAVE_VCD"] = "1"
     if args.trace:
-        env["RV32M_TRACE"] = "1"
+        env["TORV_TRACE"] = "1"
     if args.pc_trace or args.pc_trace_each_cycle:
-        env["RV32M_PC_TRACE"] = "1"
+        env["TORV_PC_TRACE"] = "1"
     if args.pc_trace_each_cycle:
-        env["RV32M_PC_TRACE_EACH_CYCLE"] = "1"
+        env["TORV_PC_TRACE_EACH_CYCLE"] = "1"
 
     for case in cases:
         if sim_target == "soc" and case.kind == "builtin":
@@ -145,9 +145,9 @@ def main() -> int:
             case_env = env.copy()
             case_env["BUILD_DIR"] = str(case_dir)
             case_env["MAX_CYCLES"] = str(case.max_cycles)
-            case_env["RV32M_KEEP_BUILD"] = "1"
+            case_env["TORV_KEEP_BUILD"] = "1"
             if args.pc_trace or args.pc_trace_each_cycle:
-                case_env["RV32M_PC_TRACE_FILE"] = str(case_dir / "pc_trace.tsv")
+                case_env["TORV_PC_TRACE_FILE"] = str(case_dir / "pc_trace.tsv")
             cmd = [
                 str(root / "scripts/run_case.sh"),
                 "--target",

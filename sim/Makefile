@@ -23,7 +23,7 @@ REGRESS_CASE ?=
 
 RUN_CASE := $(ROOT)/scripts/run_case.sh
 REGRESS  := $(ROOT)/scripts/regress.sh
-ENV_SH   := $(ROOT)/scripts/open_rv.sh
+ENV_SH   := $(ROOT)/scripts/env.sh
 
 RUN_OPTS := $(if $(filter 1,$(VCD)),--vcd)
 RUN_OPTS += $(if $(filter 1,$(TRACE)),--trace)
@@ -57,7 +57,7 @@ help:
 
 env:
 	@source "$(ENV_SH)" >/dev/null; \
-	echo "RV32M_ROOT=$$RV32M_ROOT"; \
+	echo "TORV_ROOT=$$TORV_ROOT"; \
 	echo "VERILATOR=$$(command -v verilator || true)"; \
 	echo "GTKWAVE=$$(command -v gtkwave || true)"; \
 	echo "TOOLCHAIN=$$TOOLCHAIN"; \

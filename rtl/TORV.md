@@ -15,7 +15,7 @@
 ## Simulation (single entry)
 
 ```bash
-source scripts/open_rv.sh
+source scripts/env.sh
 ./scripts/run_case.sh tests/core/asm/smoke.S
 ./scripts/regress.sh
 ```

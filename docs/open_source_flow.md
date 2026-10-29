@@ -14,7 +14,7 @@ This guide takes rv32m from a fresh Linux machine to a regression run and a sign
 
 | Step | Tool | Command |
 |------|------|---------|
-| Environment | bash | `source scripts/open_rv.sh` |
+| Environment | bash | `source scripts/env.sh` |
 | Single test | GNU toolchain + Verilator | `./scripts/run_case.sh tests/core/asm/smoke.S` |
 | Waves | GTKWave | `./scripts/run_case.sh --vcd …` then `./scripts/open_gtkwave.sh <case>` |
 | Regression | Python + Verilator | `./scripts/regress.sh` |
@@ -38,8 +38,8 @@ verilator --version                      # 5.020 tested; needs >= 5.0 (--timing)
 riscv64-unknown-elf-gcc --version        # 13.2 tested
 ```
 
-A different toolchain prefix or location also works. Set `RV32M_RISCV_TOOLCHAIN_BIN` and
-`RV32M_RISCV_GNU_PREFIX` (see `scripts/open_rv.local.sh.example`).
+A different toolchain prefix or location also works. Set `TORV_RISCV_TOOLCHAIN_BIN` and
+`TORV_RISCV_GNU_PREFIX` (see `scripts/env.local.sh.example`).
 
 ### 1.2 Docker (for LibreLane)
 
@@ -78,21 +78,21 @@ KLayout is only for viewing the GDS on the host. DRC and LVS run inside the Libr
 ```bash
 git clone https://github.com/panlong-1/rv32m.git ~/project/rv32m
 cd ~/project/rv32m
-source scripts/open_rv.sh
+source scripts/env.sh
 ```
 
-`open_rv.sh` prints what it found. Every line should resolve:
+`env.sh` prints what it found. Every line should resolve:
 
 ```text
-  RV32M_RISCV_TOOLCHAIN_BIN=/usr/bin
-  RV32M_VERILATOR=verilator (/usr/bin/verilator)
-  RV32M_GTKWAVE=gtkwave (/usr/bin/gtkwave)
+  TORV_RISCV_TOOLCHAIN_BIN=/usr/bin
+  TORV_VERILATOR=verilator (/usr/bin/verilator)
+  TORV_GTKWAVE=gtkwave (/usr/bin/gtkwave)
   PDK_ROOT=/home/<you>/.ciel (IHP SRAM models: ok)
   LIBRELANE_VENV=/home/<you>/.venv/librelane (ok; only needed for make -C librelane)
 ```
 
-To change a path without editing tracked files, copy `scripts/open_rv.local.sh.example` to
-`scripts/open_rv.local.sh`.
+To change a path without editing tracked files, copy `scripts/env.local.sh.example` to
+`scripts/env.local.sh`.
 
 ## 3. Simulation
 

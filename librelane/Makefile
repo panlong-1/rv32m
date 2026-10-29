@@ -1,4 +1,4 @@
-# open_rv32m — LibreLane (Yosys + OpenROAD + Magic/KLayout/Netgen) on IHP SG13G2.
+# TORV — LibreLane (Yosys + OpenROAD + Magic/KLayout/Netgen) on IHP SG13G2.
 # Runs inside the LibreLane Docker image.
 #   make -C librelane                      # synthesis + pre-PnR STA (minutes)
 #   make -C librelane flow                 # full RTL-to-GDS + signoff (~1-1.5 h)
@@ -34,7 +34,7 @@ export PDK_ROOT
 .PHONY: help synth flow qor figures check-env clean
 
 help:
-	@echo "open_rv32m on IHP SG13G2 (LibreLane)"
+	@echo "TORV on IHP SG13G2 (LibreLane)"
 	@echo ""
 	@echo "  make synth      Yosys synthesis + pre-PnR STA (default)"
 	@echo "  make flow       Full RTL-to-GDS: floorplan, PnR, CTS, routing, RCX,"

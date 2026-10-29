@@ -12,7 +12,7 @@ tests/periph/
 ## Commands
 
 ```bash
-source scripts/open_rv.sh
+source scripts/env.sh
 
 # Single case (+<case>.plusargs in the same IP directory)
 ./scripts/run_case.sh tests/periph/apb_uart_sv/uart_smoke.S

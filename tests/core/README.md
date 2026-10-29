@@ -81,7 +81,7 @@ The PULP UART peripheral and replay cases live under `tests/periph/apb_uart_sv/`
 
 ## Running tests
 
-From the repository root, after `source scripts/open_rv.sh`:
+From the repository root, after `source scripts/env.sh`:
 
 ```bash
 ./scripts/run_case.sh tests/core/asm/alu.S

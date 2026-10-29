@@ -17,16 +17,16 @@ user entry points.
 From the repository root:
 
 ```bash
-source scripts/open_rv.sh
+source scripts/env.sh
 # or: source regress/env.sh   # same effect
 ```
 
-Variables (see `scripts/open_rv.sh`):
+Variables (see `scripts/env.sh`):
 
-- `RV32M_ROOT` — this repository.
-- `RV32M_RISCV_TOOLCHAIN_BIN`, `RV32M_RISCV_GNU_PREFIX` — RISC-V GNU toolchain. It defaults
+- `TORV_ROOT` — this repository.
+- `TORV_RISCV_TOOLCHAIN_BIN`, `TORV_RISCV_GNU_PREFIX` — RISC-V GNU toolchain. It defaults
   to `$PROJECT_ROOT/riscv_toolchain/bin`, falling back to `/usr/bin` for the Ubuntu package.
-- `RV32M_VERILATOR`, `RV32M_VERILATOR_BIN_DIR`, `RV32M_GTKWAVE`.
+- `TORV_VERILATOR`, `TORV_VERILATOR_BIN_DIR`, `TORV_GTKWAVE`.
 - `PDK_ROOT` — IHP SG13G2 PDK (default `~/.ciel`). The SoC SRAMs are simulated with the PDK
   models `$PDK_ROOT/ihp-sg13g2/libs.ref/sg13g2_sram/verilog/RM_IHPSG13_1P_*.v`, which
   `rtl/filelist.f` lists, compiled with `-DFUNCTIONAL`.
@@ -90,7 +90,7 @@ Examples:
 - `--target soc` — the only target. `core` and `ahb` are accepted as deprecated aliases.
 - `--sim verilator` — accepted for compatibility; Verilator is the only simulator.
 
-The case directory is recreated on every run. To keep it, set `RV32M_KEEP_BUILD=1`.
+The case directory is recreated on every run. To keep it, set `TORV_KEEP_BUILD=1`.
 
 Output:
 
@@ -250,14 +250,14 @@ To rerun a built simulator by hand from the case directory:
 ./scripts/regress.sh --waves                      # one VCD per case
 ```
 
-To use a GTKWave binary that is not on `PATH`, set `RV32M_GTKWAVE`.
+To use a GTKWave binary that is not on `PATH`, set `TORV_GTKWAVE`.
 
 ## Troubleshooting
 
-- **`IHP SRAM models: MISSING`** when sourcing `open_rv.sh` — install the `ihp-sg13g2` PDK
+- **`IHP SRAM models: MISSING`** when sourcing `env.sh` — install the `ihp-sg13g2` PDK
   (see [docs/open_source_flow.md](../docs/open_source_flow.md)) or point `PDK_ROOT` at it.
 - **`riscv64-unknown-elf-gcc: not found`** — install `gcc-riscv64-unknown-elf` or set
-  `RV32M_RISCV_TOOLCHAIN_BIN` / `RV32M_RISCV_GNU_PREFIX`.
+  `TORV_RISCV_TOOLCHAIN_BIN` / `TORV_RISCV_GNU_PREFIX`.
 - **Verilator C++ build fails** — check `build/sim/soc/<case>/verilator/verilator.log`. You need
   Verilator ≥ 5.0 (for `--timing`) and a C++17 compiler.
 - **`TIMEOUT waiting for TORV tohost`** — the program never reached `tohost`. Rerun with

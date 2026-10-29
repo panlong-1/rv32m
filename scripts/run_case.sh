@@ -33,7 +33,7 @@ Output:
 EOF
 }
 
-TARGET="${RV32M_TARGET:-soc}"
+TARGET="${TORV_TARGET:-soc}"
 SIMULATOR=verilator
 SRC=""
 
@@ -56,28 +56,28 @@ while (($#)); do
       shift
       ;;
     --vcd|--waves)
-      export RV32M_WAVE_VCD=1
+      export TORV_WAVE_VCD=1
       shift
       ;;
     --trace)
-      export RV32M_TRACE=1
+      export TORV_TRACE=1
       shift
       ;;
     --pc-trace)
-      export RV32M_PC_TRACE=1
+      export TORV_PC_TRACE=1
       shift
       ;;
     --pc-trace-file)
-      export RV32M_PC_TRACE_FILE="${2:?missing value for --pc-trace-file}"
+      export TORV_PC_TRACE_FILE="${2:?missing value for --pc-trace-file}"
       shift 2
       ;;
     --pc-trace-file=*)
-      export RV32M_PC_TRACE_FILE="${1#*=}"
+      export TORV_PC_TRACE_FILE="${1#*=}"
       shift
       ;;
     --pc-trace-each-cycle)
-      export RV32M_PC_TRACE=1
-      export RV32M_PC_TRACE_EACH_CYCLE=1
+      export TORV_PC_TRACE=1
+      export TORV_PC_TRACE_EACH_CYCLE=1
       shift
       ;;
     --max-cycles)
@@ -126,7 +126,7 @@ if [[ "$SIMULATOR" != "verilator" ]]; then
   exit 2
 fi
 
-export RV32M_TARGET="$TARGET"
+export TORV_TARGET="$TARGET"
 
 case "$TARGET" in
   core|ahb)
@@ -140,5 +140,5 @@ case "$TARGET" in
     exit 2
     ;;
 esac
-export RV32M_TARGET=soc
+export TORV_TARGET=soc
 exec "$ROOT/scripts/internal/run_soc_sim.sh" "$SRC"

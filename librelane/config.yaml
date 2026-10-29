@@ -1,4 +1,4 @@
-# open_rv32m — LibreLane on IHP SG13G2 (core + AHB masters, no SRAM macros).
+# TORV — LibreLane on IHP SG13G2 (core + AHB masters, no SRAM macros).
 #   make -C librelane          synthesis + pre-PnR STA
 #   make -C librelane flow     full RTL-to-GDS + signoff
 meta:

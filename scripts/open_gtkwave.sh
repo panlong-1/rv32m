@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-GTKWAVE="${GTKWAVE:-${RV32M_GTKWAVE:-gtkwave}}"
+GTKWAVE="${GTKWAVE:-${TORV_GTKWAVE:-gtkwave}}"
 
 usage() {
   cat <<'EOF'
@@ -25,7 +25,7 @@ Example:
 EOF
 }
 
-TARGET="${RV32M_TARGET:-soc}"
+TARGET="${TORV_TARGET:-soc}"
 BUILD_DIR=""
 VCD=""
 
@@ -75,7 +75,7 @@ STEM="${1:-smoke}"
 [[ "$TARGET" == core || "$TARGET" == ahb ]] && TARGET=soc
 
 if ! command -v "$GTKWAVE" >/dev/null 2>&1; then
-  echo "ERROR: '$GTKWAVE' not in PATH. Install GTKWave (distro package or set RV32M_GTKWAVE)." >&2
+  echo "ERROR: '$GTKWAVE' not in PATH. Install GTKWave (distro package or set TORV_GTKWAVE)." >&2
   exit 127
 fi
 

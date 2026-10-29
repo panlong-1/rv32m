@@ -73,7 +73,7 @@ Details: [spec/RV32IM_Current_Implementation.md](spec/RV32IM_Current_Implementat
 | `tests/core/asm/` | Directed assembly tests, `link.ld`, per-case `.plusargs` |
 | `tests/periph/` | Peripheral tests (UART) |
 | `regress/` | Regression driver and case lists ([README](regress/README.md)) |
-| `scripts/` | `open_rv.sh` environment, `run_case.sh`, `regress.sh`, Verilator build, waveform/trace/perf helpers |
+| `scripts/` | `env.sh` environment, `run_case.sh`, `regress.sh`, Verilator build, waveform/trace/perf helpers |
 | `ip/` | Third-party IP filelist; sources are fetched into `ip/third_party/` ([README](ip/README.md)) |
 | `librelane/` | LibreLane config, SDC, `Makefile` (`synth`, `flow`, `figures`), `qor.py`, `figures/` (layout and QoR plot scripts) |
 | `spec/` | [RV32IM_Current_Implementation.md](spec/RV32IM_Current_Implementation.md) — microarchitecture reference |
@@ -108,7 +108,7 @@ The IHP PDK is needed **for simulation as well**, because the SoC SRAMs use the 
 ```bash
 git clone https://github.com/panlong-1/rv32m.git
 cd rv32m
-source scripts/open_rv.sh                        # paths, PATH, PDK_ROOT; prints what it found
+source scripts/env.sh                        # paths, PATH, PDK_ROOT; prints what it found
 
 ./scripts/run_case.sh tests/core/asm/smoke.S     # one test (fetches third-party IP on first run)
 ./scripts/regress.sh                             # full regression: 33 cases
@@ -122,9 +122,9 @@ make -C librelane flow                           # full RTL-to-GDS + signoff (~1
 
 ## Environment
 
-`scripts/open_rv.sh` is the single place for paths. It:
+`scripts/env.sh` is the single place for paths. It:
 
-- sets `RV32M_ROOT`, `PROJECT_ROOT` (the repo's parent) and `PDK_ROOT`;
+- sets `TORV_ROOT`, `PROJECT_ROOT` (the repo's parent) and `PDK_ROOT`;
 - picks the RISC-V toolchain: `$PROJECT_ROOT/riscv_toolchain/bin` if present, otherwise
   `/usr/bin`;
 - puts `scripts/` and the toolchain on `PATH`.
@@ -134,15 +134,15 @@ the same setup from anywhere in the tree.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `RV32M_RISCV_TOOLCHAIN_BIN` | `$PROJECT_ROOT/riscv_toolchain/bin` or `/usr/bin` | Directory holding `${PREFIX}gcc` |
-| `RV32M_RISCV_GNU_PREFIX` | `riscv64-unknown-elf-` | Toolchain prefix |
-| `RV32M_VERILATOR` / `RV32M_VERILATOR_BIN_DIR` | `verilator` / — | Verilator binary / extra `PATH` entry |
-| `RV32M_GTKWAVE` | `gtkwave` | GTKWave binary |
+| `TORV_RISCV_TOOLCHAIN_BIN` | `$PROJECT_ROOT/riscv_toolchain/bin` or `/usr/bin` | Directory holding `${PREFIX}gcc` |
+| `TORV_RISCV_GNU_PREFIX` | `riscv64-unknown-elf-` | Toolchain prefix |
+| `TORV_VERILATOR` / `TORV_VERILATOR_BIN_DIR` | `verilator` / — | Verilator binary / extra `PATH` entry |
+| `TORV_GTKWAVE` | `gtkwave` | GTKWave binary |
 | `PDK_ROOT` | `~/.ciel` | IHP SG13G2 PDK (SRAM models, LibreLane) |
 | `LIBRELANE_VENV` | `~/.venv/librelane` | LibreLane Python venv |
 
-To override paths without editing tracked files, copy `scripts/open_rv.local.sh.example` to
-`scripts/open_rv.local.sh`. That copy is gitignored and is sourced after the defaults.
+To override paths without editing tracked files, copy `scripts/env.local.sh.example` to
+`scripts/env.local.sh`. That copy is gitignored and is sourced after the defaults.
 
 ## Simulation
 
@@ -151,7 +151,7 @@ To override paths without editing tracked files, copy `scripts/open_rv.local.sh.
 ./scripts/run_case.sh --vcd tests/core/asm/hazard.S            # + hazard.vcd
 ./scripts/run_case.sh --pc-trace tests/core/asm/smoke.S        # + pc_trace.tsv (PC and WB columns)
 ./scripts/run_case.sh --max-cycles 50000 tests/core/asm/muldiv.S
-RV32M_KEEP_BUILD=1 ./scripts/run_case.sh tests/core/asm/smoke.S   # keep the existing build dir
+TORV_KEEP_BUILD=1 ./scripts/run_case.sh tests/core/asm/smoke.S   # keep the existing build dir
 ```
 
 - Each case directory holds the ELF, HEX, disassembly (`.dump`), `<case>.sim.log`, the

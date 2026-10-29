@@ -12,7 +12,7 @@ First SoC simulation run invokes `scripts/fetch_ip.sh` if tarballs are missing.
 ## Unified commands
 
 ```bash
-source scripts/open_rv.sh
+source scripts/env.sh
 ./scripts/run_case.sh tests/periph/apb_uart_sv/uart_smoke.S
 ./scripts/regress.sh
 ```
