@@ -98,7 +98,7 @@ for (bx, by), c in sorted(bins.items()):
     out.append(f'<rect x="{bx*B*S:.0f}" y="{(H-(by+1)*B)*S:.0f}" width="{B*S:.0f}" height="{B*S:.0f}" '
                f'fill="{colours[g]}" fill-opacity="{op:.2f}"/>')
 out.append('</g>')
-out.append(f'<text x="10" y="20" font-weight="bold">rv32im_ahb_top placement by module '
+out.append(f'<text x="10" y="20" font-weight="bold">torv_cpu placement by module '
            f'({W:.0f} × {H:.0f} µm)</text>')
 lx = W * S + 25
 for g in range(len(names)):

@@ -1,8 +1,8 @@
 # TORV SoC address map
 
-Reference for `torv_soc_top` simulation and asm tests. The CPU uses `addr_decode` in the core for DBUS vs SBUS routing; the SoC muxes SBUS into SRAM, APB UART, or (testbench-only) tohost.
+Reference for `torv_soc` simulation and asm tests. The CPU uses `torv_addr_decode` in the core for DBUS vs SBUS routing; the SoC muxes SBUS into SRAM, APB UART, or (testbench-only) tohost.
 
-## CPU bus routing (`addr_decode`)
+## CPU bus routing (`torv_addr_decode`)
 
 | Address range | Master | Typical use |
 |---------------|--------|-------------|
@@ -10,7 +10,7 @@ Reference for `torv_soc_top` simulation and asm tests. The CPU uses `addr_decode
 | `0x4000_0000` – `0x4FFF_FFFF` | **SBUS** | SoC SBUS SRAM + peripherals |
 | `0xF000_0000` – `0xFFFF_FFFF` | **SBUS** | Testbench tohost (not decoded in DUT) |
 
-## SoC slaves (`torv_soc_top`)
+## SoC slaves (`torv_soc`)
 
 | Bus | Region | Size / note | Device |
 |-----|--------|-------------|--------|
@@ -34,8 +34,8 @@ UART is intentionally at **`0x4000_1000`** so it does not alias core SBUS tests 
 
 ## Related files
 
-- `rtl/torv_soc_top.sv` — parameter `UART_APB_BASE`, header comments
-- `rtl/addr_decode.sv` — core DBUS/SBUS select
+- `rtl/torv_soc.sv` — parameter `UART_APB_BASE`, header comments
+- `rtl/torv_addr_decode.sv` — core DBUS/SBUS select
 - `rtl/torv_ahb_sram.sv` — AHB-Lite wrapper for the IHP SRAM macro (write buffer, read merge)
 - `tests/core/asm/sram_wbuf.S` — directed test for the wrapper's write buffer / read merge
 - `docs/bugs/byg_torv_soc_debug.md` — BYG-001 UART vs SBUS collision

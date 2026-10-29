@@ -12,6 +12,8 @@ LL_DIR         := $(abspath $(CURDIR))
 LIBRELANE_VENV ?= $(HOME)/.venv/librelane
 PDK_ROOT       ?= $(HOME)/.ciel
 PDK            := ihp-sg13g2
+# Top module, read from config.yaml (DESIGN_NAME)
+DESIGN         := $(shell awk '/^DESIGN_NAME:/{print $$2}' $(LL_DIR)/config.yaml)
 # Run tag (runs/<TAG>): "flow" for make flow / figures, otherwise "synth"
 TAG            ?= $(if $(filter flow figures,$(MAKECMDGOALS)),flow,synth)
 # Override the config.yaml clock period (ns)
@@ -66,10 +68,10 @@ qor:
 	@python3 "$(LL_DIR)/qor.py" "$(RUN_DIR)"
 
 figures:
-	@test -f "$(RUN_DIR)/final/gds/rv32im_ahb_top.gds" || \
+	@test -f "$(RUN_DIR)/final/gds/$(DESIGN).gds" || \
 		( echo "ERROR: $(RUN_DIR) has no final GDS; run make flow first"; exit 1 )
 	mkdir -p "$(FIG_DIR)"
-	python3 figures/placement_map.py "$(RUN_DIR)/final/def/rv32im_ahb_top.def" "$(FIG_DIR)/placement_modules.svg"
+	python3 figures/placement_map.py "$(RUN_DIR)/final/def/$(DESIGN).def" "$(FIG_DIR)/placement_modules.svg"
 	python3 figures/qor_charts.py "$(FIG_DIR)" $(if $(HIST),$(HIST),$(TAG)=$(RUN_DIR))
 	@set -e; \
 	read X1 Y1 X2 Y2 < <(python3 -c "import json; print(json.load(open('$(RUN_DIR)/final/metrics.json'))['design__die__bbox'])"); \
@@ -77,7 +79,7 @@ figures:
 	CX=$$(python3 -c "print(($$X1+$$X2)/2)"); CY=$$(python3 -c "print(($$Y1+$$Y2)/2)"); \
 	render() { docker run --rm -u $$(id -u):$$(id -g) -v "$(PDK_ROOT)":"$(PDK_ROOT)" \
 		-v "$$(readlink -f $(PDK_ROOT))":"$$(readlink -f $(PDK_ROOT))" -v "$(LL_DIR)":"$(LL_DIR)" -v "$(FIG_DIR)":"$(FIG_DIR)" \
-		$(LL_IMAGE) klayout -zz -rd gds="$(RUN_DIR)/final/gds/rv32im_ahb_top.gds" -rd lyp="$$LYP" \
+		$(LL_IMAGE) klayout -zz -rd gds="$(RUN_DIR)/final/gds/$(DESIGN).gds" -rd lyp="$$LYP" \
 		-rd out="$(FIG_DIR)/$$1" -rd box="$$2" -rd w="$$3" -r "$(LL_DIR)/figures/render_gds.py"; }; \
 	render layout_full.png "$$X1,$$Y1,$$X2,$$Y2" 900; \
 	render layout_zoom.png "$$(python3 -c "print(f'{$$CX-12},{$$CY-8},{$$CX+12},{$$CY+8}')")" 1000; \

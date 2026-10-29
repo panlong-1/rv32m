@@ -14,9 +14,9 @@ The current core is a 32-bit in-order RISC-V core with a classic five-stage pipe
 
 Module hierarchy:
 
-- `rv32im_core` — the pipeline, with valid/ready-style IBUS/DBUS/SBUS ports (§3).
-- `rv32im_ahb_top` — `rv32im_core` plus three pipelined AHB-Lite masters: `rv32im_ahb_fetch` (IBUS) and two `rv32im_ahb_dport` (DBUS, SBUS). This is the block implemented with LibreLane (§12).
-- `torv_soc_top` — the TORV SoC: `rv32im_ahb_top`, three `torv_ahb_sram` (IHP SRAM macros), SoCBUS `AHB_APB_BRIDGE` and the PULP UART (§9.1).
+- `torv_core` — the pipeline, with valid/ready-style IBUS/DBUS/SBUS ports (§3).
+- `torv_cpu` — `torv_core` plus three pipelined AHB-Lite masters: `torv_ahb_fetch` (IBUS) and two `torv_ahb_dport` (DBUS, SBUS). This is the block implemented with LibreLane (§12).
+- `torv_soc` — the TORV SoC: `torv_cpu`, three `torv_ahb_sram` (IHP SRAM macros), SoCBUS `AHB_APB_BRIDGE` and the PULP UART (§9.1).
 
 The implementation is verified in simulation and taken through an open-source RTL-to-GDS flow on IHP SG13G2. It is not yet a production-ready ASIC microarchitecture (no traps, CSRs or bus error handling).
 
@@ -60,17 +60,17 @@ RISC-V divide corner cases are implemented:
   - `DIV` returns `32'h8000_0000`
   - `REM` returns `0`
 
-Current implementation note: `muldiv_unit` computes `MUL*` in two EX cycles with one shared 33x33 multiplier (operand registers, then multiply). `DIV/REM` use a multi-cycle restoring divider. The hazard unit holds the front end while either is not `ready` (§7.2, §9).
+Current implementation note: `torv_muldiv_unit` computes `MUL*` in two EX cycles with one shared 33x33 multiplier (operand registers, then multiply). `DIV/REM` use a multi-cycle restoring divider. The hazard unit holds the front end while either is not `ready` (§7.2, §9).
 
-## 3. Core Interface (`rv32im_core`)
+## 3. Core Interface (`torv_core`)
 
-`rv32im_core` has three Harvard-style buses. `rv32im_ahb_top` turns each one into an AHB-Lite master. On the data buses, the address-phase signals come from EX and the data-phase signals belong to MEM.
+`torv_core` has three Harvard-style buses. `torv_cpu` turns each one into an AHB-Lite master. On the data buses, the address-phase signals come from EX and the data-phase signals belong to MEM.
 
 ### 3.1 IBUS
 
 IBUS is used only for instruction fetch.
 
-- `ibus_next_addr`: PC of the next cycle (`stall_pc ? pc : pc_next`). `rv32im_ahb_fetch` issues it as the AHB address phase, with `HTRANS = NONSEQ` whenever `HREADY` is high.
+- `ibus_next_addr`: PC of the next cycle (`stall_pc ? pc : pc_next`). `torv_ahb_fetch` issues it as the AHB address phase, with `HTRANS = NONSEQ` whenever `HREADY` is high.
 - `ibus_addr`: current PC. Its data phase is the current cycle.
 - `ibus_ready`: the fetched word for `ibus_addr` is valid. It is HREADY, no error, and a data-phase address that matches the PC. When low, the PC holds and IF/ID gets a bubble.
 - `ibus_rdata`: fetched instruction word (HRDATA).
@@ -82,7 +82,7 @@ One instruction is fetched per cycle from a zero-wait slave.
 DBUS carries ordinary data memory accesses. SBUS carries the SoC system/MMIO window and `tohost` (§4). The two ports have the same signals:
 
 - `*_valid`: address phase (EX). Asserted for a load/store routed to this bus, and only while the other data bus is ready (§9).
-- `*_addr`, `*_we`, `*_be`: address-phase byte address (from the AGU), write enable and byte enables. `rv32im_ahb_dport` converts `be` into `HSIZE`.
+- `*_addr`, `*_we`, `*_be`: address-phase byte address (from the AGU), write enable and byte enables. `torv_ahb_dport` converts `be` into `HSIZE`.
 - `*_ready`: bus HREADY. A load/store in EX, or an active data phase with `*_ready` low, freezes the pipeline (`bus_stall`).
 - `*_dph`: from the AHB port; an accepted address phase is now in its data phase.
 - `*_wdata`: data-phase store data, aligned to byte lanes (from `ex_mem_store_data`).
@@ -92,7 +92,7 @@ The LSU drives at most one of `dbus_valid` or `sbus_valid` for an active memory 
 
 ## 4. Address Map
 
-`addr_decode` selects SBUS for:
+`torv_addr_decode` selects SBUS for:
 
 - `0x4000_0000` through `0x4FFF_FFFF`
 - `0xF000_0000` through `0xFFFF_FFFF`
@@ -115,7 +115,7 @@ The inserted bubble instruction is `ADDI x0, x0, 0` (`32'h0000_0013`).
 
 ## 6. Control and Decode
 
-`decoder.sv` generates:
+`torv_decoder.sv` generates:
 
 - `reg_write`
 - `mem_read`
@@ -150,7 +150,7 @@ Immediate types:
 
 ### 7.1 ALU
 
-`alu.sv` implements:
+`torv_alu.sv` implements:
 
 - Add/subtract
 - Bitwise AND/OR/XOR
@@ -171,7 +171,7 @@ The ALU is structured following the `sm-LN.pdf` datapath notes:
 
 ### 7.2 RV32M Unit
 
-`muldiv_unit.sv` implements RV32M with separate multiplier and iterative divider paths.
+`torv_muldiv_unit.sv` implements RV32M with separate multiplier and iterative divider paths.
 
 Multiplier:
 
@@ -213,13 +213,13 @@ Taken branches and jumps flush IF/ID and ID/EX when the pipeline is not stalled 
 
 ## 8. Memory Stage
 
-`lsu.sv` supports byte-enable generation and aligned write data for:
+`torv_lsu.sv` supports byte-enable generation and aligned write data for:
 
 - `SB`: single byte enable based on `addr[1:0]`
 - `SH`: halfword byte enable based on `addr[1]`
 - `SW`: all byte lanes enabled
 
-Load data extension is performed in `rv32im_core`:
+Load data extension is performed in `torv_core`:
 
 - `LB`: sign-extend selected byte
 - `LH`: sign-extend selected halfword
@@ -231,24 +231,24 @@ Misaligned access exceptions are not implemented. The current logic selects byte
 
 ## 9. Hazard Handling
 
-`forwarding_unit.sv` implements forwarding into EX:
+`torv_forwarding_unit.sv` implements forwarding into EX:
 
 - EX/MEM to EX when the EX/MEM instruction writes a register and is not a load
 - MEM/WB to EX when the MEM/WB instruction writes a matching register
 - `x0` is never forwarded as a writable destination
 
-The forwarding selects are registered: `rv32im_core` evaluates `forwarding_unit` on the next-state values of the ID/EX source fields and the EX/MEM and MEM/WB `rd`/write-enable fields, and registers `forward_a`/`forward_b`. This is cycle-identical to the combinational decision (a simulation-only check, `u_fwd_chk`, stops the run on any mismatch) and keeps the register-number compare out of the EX operand → branch target / AGU → AHB output paths. MEM/WB holds a single pre-selected `mem_wb_result` (load data, ALU result or PC+4, selected in MEM), so the WB forwarding source has no `wb_sel` mux.
+The forwarding selects are registered: `torv_core` evaluates `torv_forwarding_unit` on the next-state values of the ID/EX source fields and the EX/MEM and MEM/WB `rd`/write-enable fields, and registers `forward_a`/`forward_b`. This is cycle-identical to the combinational decision (a simulation-only check, `u_fwd_chk`, stops the run on any mismatch) and keeps the register-number compare out of the EX operand → branch target / AGU → AHB output paths. MEM/WB holds a single pre-selected `mem_wb_result` (load data, ALU result or PC+4, selected in MEM), so the WB forwarding source has no `wb_sel` mux.
 
 The load/store address comes from a dedicated AGU in EX (`fa_val + id_ex_imm`), not from the ALU. `MUL*` takes two EX cycles: operands are registered in the first, multiplied in the second.
 
 All three buses are pipelined AHB-Lite masters:
 
-- IBUS (`rv32im_ahb_fetch`): the core exports `ibus_next_addr = stall_pc ? pc : pc_next`, issued as the address phase; its data phase lines up with `pc` one cycle later (one fetch per cycle).
-- DBUS/SBUS (`rv32im_ahb_dport`): the address phase is issued from EX (AGU address, `addr_decode`, `lsu` in EX); the data phase is the MEM stage (store data from `ex_mem_store_data`, load data captured into MEM/WB). A zero-wait slave completes a load/store without stalling.
+- IBUS (`torv_ahb_fetch`): the core exports `ibus_next_addr = stall_pc ? pc : pc_next`, issued as the address phase; its data phase lines up with `pc` one cycle later (one fetch per cycle).
+- DBUS/SBUS (`torv_ahb_dport`): the address phase is issued from EX (AGU address, `torv_addr_decode`, `torv_lsu` in EX); the data phase is the MEM stage (store data from `ex_mem_store_data`, load data captured into MEM/WB). A zero-wait slave completes a load/store without stalling.
 - A request is presented only when the instruction leaves EX on the accepting edge, so each load/store is issued exactly once (no AHB/APB replay of UART THR/RBR side effects).
 - A data-bus request is presented only while the other data bus is ready, and a load/store in EX stalls while either data bus is not ready, so `bus_stall` does not depend on the EX address decode.
 
-`hazard_unit.sv` handles:
+`torv_hazard_unit.sv` handles:
 
 - IF/ID source-use decoding
 - load-use bubble insertion when ID/EX is a load used by IF/ID
@@ -267,7 +267,7 @@ Priority in the combinational hazard logic is:
 
 Only item 1 stops MEM/WB, so the back end always drains and EX never waits on a producer that retires underneath it.
 
-`rv32im_core` complements the hazard unit:
+`torv_core` complements the hazard unit:
 
 - IF/ID and ID/EX flush only when `flush && !stall_if_id` / `flush && !stall_id_ex`
 - MEM/WB captures EX/MEM whenever `!stall_mem_wb`
@@ -279,11 +279,11 @@ Directed bus-overlap tests (require testbench plusargs in `tests/core/asm/*.plus
 - `hazard_sbus_replay_smoke.S` — IBUS stall during one TORV UART store at `0x4000_1000`; the TB checks `+replay_expect=1`
 - `hazard_sbus_rx_replay_smoke.S` — the same for a UART RBR read (`+replay_expect_rbr=1`)
 
-The core also includes a WB-to-ID register read bypass in `rv32im_core`. This models write-first register file behavior for same-cycle writeback/decode dependencies and avoids X propagation when an instruction in ID reads the register being written in WB.
+The core also includes a WB-to-ID register read bypass in `torv_core`. This models write-first register file behavior for same-cycle writeback/decode dependencies and avoids X propagation when an instruction in ID reads the register being written in WB.
 
 ### 9.1 TORV SoC simulation top
 
-`torv_soc_top` wraps `rv32im_ahb_top` (pipelined masters: `rv32im_ahb_fetch` for IBUS, two `rv32im_ahb_dport` for DBUS/SBUS) plus `torv_ahb_sram` for IMEM/DBUS/SBUS SRAM and the APB UART peripheral window. The SBUS HRDATA/HREADY mux and APB PSEL use the data-phase slave select `s_periph_dph`.
+`torv_soc` wraps `torv_cpu` (pipelined masters: `torv_ahb_fetch` for IBUS, two `torv_ahb_dport` for DBUS/SBUS) plus `torv_ahb_sram` for IMEM/DBUS/SBUS SRAM and the APB UART peripheral window. The SBUS HRDATA/HREADY mux and APB PSEL use the data-phase slave select `s_periph_dph`.
 
 `torv_ahb_sram` is a zero-wait AHB-Lite wrapper around one IHP SG13G2 `RM_IHPSG13_1P_<WORDS>x32_c2_bm_bist` macro (`WORDS` = 256/512/1024; `IMEM_WORDS`/`DMEM_WORDS`/`SBMEM_WORDS` default to 1024 = 4 KiB):
 
@@ -301,7 +301,7 @@ Tests: `tests/periph/<ip>/` (currently `apb_uart_sv/`). Unified entry: `./script
 
 ## 10. Register File
 
-`regfile.sv` implements:
+`torv_regfile.sv` implements:
 
 - 32 architectural registers
 - two asynchronous read ports
@@ -312,7 +312,7 @@ The physical storage is `mem[31:1]`; there is no reset initialization for x1 thr
 
 ## 11. Verification Status
 
-The self-checking Verilator testbench is `sim/tb_torv_soc.sv`, around `torv_soc_top`. It provides:
+The self-checking Verilator testbench is `sim/tb_torv_soc.sv`, around `torv_soc`. It provides:
 
 - program/data images loaded into the IHP SRAM macro arrays before reset (`+imem=<hex>`, optional `+dmem=<hex>`). The image goes through a byte buffer, and an image that does not fit is an error.
 - program-controlled pass/fail through a store to `tohost` (`0xF000_0000`), sampled when SBUS HREADY is high
@@ -336,7 +336,7 @@ Not covered yet: randomized bus wait states, long C programs (no `crt0`/C runtim
 
 ## 12. Implementation Status (IHP SG13G2, LibreLane)
 
-The open-source flow in `librelane/` implements `rv32im_ahb_top` (core + AHB masters; the SRAM macros and peripherals are outside the block):
+The open-source flow in `librelane/` implements `torv_cpu` (core + AHB masters; the SRAM macros and peripherals are outside the block):
 
 - LibreLane 3.0.16 Classic flow in Docker: Yosys (slang frontend, ABC buffering, Booth multiplier) → OpenROAD floorplan/placement/CTS/routing with post-CTS and post-global-route timing repair → RC extraction → multi-corner STA → Magic/KLayout DRC, Netgen LVS, antenna check.
 - `make -C librelane` runs synthesis and pre-PnR STA. `make -C librelane flow` runs RTL-to-GDS. See `docs/open_source_flow.md`.
@@ -358,19 +358,19 @@ One IHP 1024x32 SRAM macro is 416.6 x 336.5 µm (≈ 140k µm²), so the three d
 
 ## 13. Current Module List
 
-Core and bus masters (`rv32im_ahb_top`):
+Core and bus masters (`torv_cpu`):
 
-- `rv32im_ahb_top.sv` — core + AHB-Lite masters
-- `rv32im_ahb_fetch.sv` — pipelined IBUS master
-- `rv32im_ahb_dport.sv` — pipelined DBUS/SBUS master
-- `rv32im_core.sv` — pipeline, AGU, forwarding/MEM-WB registers, load extension
-- `pc_unit.sv`, `regfile.sv`, `decoder.sv`, `imm_gen.sv`, `alu_control.sv`, `alu.sv`
-- `muldiv_unit.sv`, `forwarding_unit.sv`, `hazard_unit.sv`, `addr_decode.sv`, `lsu.sv`
-- `bus_if.sv` — typedef-only bus bundle definitions (in `rtl/filelist.f`, not in the LibreLane file list)
+- `torv_cpu.sv` — core + AHB-Lite masters
+- `torv_ahb_fetch.sv` — pipelined IBUS master
+- `torv_ahb_dport.sv` — pipelined DBUS/SBUS master
+- `torv_core.sv` — pipeline, AGU, forwarding/MEM-WB registers, load extension
+- `torv_pc_unit.sv`, `torv_regfile.sv`, `torv_decoder.sv`, `torv_imm_gen.sv`, `torv_alu_ctrl.sv`, `torv_alu.sv`
+- `torv_muldiv_unit.sv`, `torv_forwarding_unit.sv`, `torv_hazard_unit.sv`, `torv_addr_decode.sv`, `torv_lsu.sv`
+- `torv_bus_types.sv` — typedef-only bus bundle definitions (in `rtl/filelist.f`, not in the LibreLane file list)
 
 SoC:
 
-- `torv_soc_top.sv` — TORV SoC integration
+- `torv_soc.sv` — TORV SoC integration
 - `torv_ahb_sram.sv` — AHB-Lite wrapper for the IHP SRAM macro
 - third-party: SoCBUS `AHB_APB_BRIDGE`, PULP `apb_uart_sv` (`ip/filelist.f`)
 - PDK models: `RM_IHPSG13_1P_*` from `$PDK_ROOT/ihp-sg13g2/libs.ref/sg13g2_sram/verilog`
@@ -388,7 +388,7 @@ SoC:
 ## 15. Recommended Next Steps
 
 1. Close the slow corner: pre-select the EX/MEM forwarding value in EX, set the I/O budgets from the real SoC/SRAM timing, or accept 12.5 ns at the slow corner.
-2. Implement `torv_soc_top` with the SRAM macros (macro placement, power) for a full SoC GDS.
+2. Implement `torv_soc` with the SRAM macros (macro placement, power) for a full SoC GDS.
 3. Add `crt0`, a C linker script and CoreMark/Dhrystone for published IPC.
 4. Add randomized HREADY back-pressure and SVA on the hazard/replay rules.
 5. Decide whether unsupported instructions remain NOP-like/ignored or gain a trap path in a later milestone.

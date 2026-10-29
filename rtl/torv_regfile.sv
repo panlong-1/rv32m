@@ -1,5 +1,5 @@
 // 32 x 32 register file, x0 hardwired (spec §12)
-module regfile (
+module torv_regfile (
   input  logic        clk,
   input  logic [4:0]  ra1,
   input  logic [4:0]  ra2,

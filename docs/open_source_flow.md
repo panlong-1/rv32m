@@ -1,14 +1,14 @@
 # Open-source flow: RTL → simulation → GDS
 
 This guide takes rv32m from a fresh Linux machine to a regression run and a signed-off GDS of
-`rv32im_ahb_top` on IHP SG13G2. Every tool in it is open source.
+`torv_cpu` on IHP SG13G2. Every tool in it is open source.
 
 ```text
  tests/*.S ──gcc──> .elf/.hex ──┐
-                                ├─> Verilator (tb_torv_soc + torv_soc_top + IHP SRAM models)
+                                ├─> Verilator (tb_torv_soc + torv_soc + IHP SRAM models)
  rtl/*.sv + ip/ + PDK models ───┘        └─> [PASS]/[FAIL], [PERF], VCD (GTKWave), PC trace
 
- rtl/ (rv32im_ahb_top) ──LibreLane──> Yosys ─> OpenROAD (floorplan, place, CTS, route, RCX, STA)
+ rtl/ (torv_cpu) ──LibreLane──> Yosys ─> OpenROAD (floorplan, place, CTS, route, RCX, STA)
                                      ─> Magic / KLayout (GDS, DRC) ─> Netgen (LVS) ─> GDS
 ```
 
@@ -20,7 +20,7 @@ This guide takes rv32m from a fresh Linux machine to a regression run and a sign
 | Regression | Python + Verilator | `./scripts/regress.sh` |
 | Synthesis + STA | LibreLane (Yosys, OpenROAD) | `make -C librelane` |
 | RTL-to-GDS + signoff | LibreLane (OpenROAD, Magic, KLayout, Netgen) | `make -C librelane flow` |
-| Layout view | KLayout | `klayout -l $PDK_ROOT/ihp-sg13g2/libs.tech/klayout/tech/sg13g2.lyp runs/flow/final/gds/rv32im_ahb_top.gds` |
+| Layout view | KLayout | `klayout -l $PDK_ROOT/ihp-sg13g2/libs.tech/klayout/tech/sg13g2.lyp runs/flow/final/gds/torv_cpu.gds` |
 
 ## 1. Install the tools
 
@@ -150,7 +150,7 @@ make -C librelane synth CLOCK_PERIOD=7 TAG=p7     # other clock, separate run di
 Inputs:
 
 - [librelane/config.yaml](../librelane/config.yaml):
-  - design `rv32im_ahb_top` with its RTL list;
+  - design `torv_cpu` with its RTL list;
   - slang SystemVerilog frontend, `SYNTH_ABC_BUFFERING`, `SYNTH_MUL_BOOTH`;
   - `RUN_POST_GRT_RESIZER_TIMING`;
   - `CLOCK_PERIOD: 10.0`.
@@ -164,7 +164,7 @@ worse than the pre-PnR estimate. Use it to compare RTL variants, not as a signof
 
 Useful outputs in `librelane/runs/<tag>/`:
 
-- `final/nl/rv32im_ahb_top.nl.v` — mapped netlist
+- `final/nl/torv_cpu.nl.v` — mapped netlist
 - `06-yosys-synthesis/reports/stat.rpt` — cell report
 - `*-openroad-staprepnr/<corner>/max.rpt`, `violator_list.rpt` — timing per corner
   (`nom_slow_1p08V_125C`, `nom_typ_1p20V_25C`, `nom_fast_1p32V_m40C`)
@@ -196,7 +196,7 @@ Check these after a run:
 | Summary | `make -C librelane qor TAG=flow` | — |
 | DRC / LVS / antenna | `runs/flow/*-misc-reportmanufacturability/manufacturability.rpt` | all "Passed" |
 | Timing | `runs/flow/*-openroad-stapostpnr/<corner>/violator_list.rpt`, `max.rpt`, `min.rpt` | hold met; setup see below |
-| Layout | `runs/flow/final/gds/rv32im_ahb_top.gds`, picture `final/render/rv32im_ahb_top.png` | — |
+| Layout | `runs/flow/final/gds/torv_cpu.gds`, picture `final/render/torv_cpu.png` | — |
 | Abstracts | `final/lef/`, `final/lib/<corner>/`, `final/sdf/`, `final/spef/` | for integration in a larger chip |
 
 Results at 10 ns (v0.6 RTL, run `full_p10_fwd`):
@@ -218,7 +218,7 @@ To view the layout:
 
 ```bash
 klayout -l $PDK_ROOT/ihp-sg13g2/libs.tech/klayout/tech/sg13g2.lyp \
-        librelane/runs/flow/final/gds/rv32im_ahb_top.gds
+        librelane/runs/flow/final/gds/torv_cpu.gds
 ```
 
 To regenerate the README figures from a full run:

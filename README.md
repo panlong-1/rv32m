@@ -26,7 +26,7 @@ No commercial EDA tool or proprietary PDK is needed. Step-by-step instructions a
   - **IBUS** — one fetch per cycle;
   - **DBUS / SBUS** — address phase in EX, data phase in MEM, so loads and stores to a
     zero-wait slave never stall.
-- **TORV SoC (`torv_soc_top`):**
+- **TORV SoC (`torv_soc`):**
   - three IHP SG13G2 SRAM macros, 4 KiB each by default, behind the zero-wait wrapper
     `torv_ahb_sram`;
   - SoCBUS `AHB_APB_BRIDGE` and the PULP `apb_uart_sv` UART.
@@ -35,21 +35,21 @@ No commercial EDA tool or proprietary PDK is needed. Step-by-step instructions a
   - 33-case regression (`regress/cases/soc.list`) with pass/fail via a `tohost` store;
   - `[PERF]` counters per case and `perf_summary.csv` per run;
   - PC/WB trace checks for hazard cases.
-- **Implementation:** `rv32im_ahb_top` closes DRC, LVS and antenna checks at 10 ns
+- **Implementation:** `torv_cpu` closes DRC, LVS and antenna checks at 10 ns
   (results below).
 
 ## Architecture
 
 ![TORV SoC block diagram](docs/img/soc_arch.svg)
 
-The core is a Harvard machine with three AHB-Lite masters. `addr_decode` (in EX) sends
+The core is a Harvard machine with three AHB-Lite masters. `torv_addr_decode` (in EX) sends
 `0x4xxx_xxxx` and `0xFxxx_xxxx` to SBUS and everything else to DBUS. The dashed box is
-`rv32im_ahb_top`, the block that goes through LibreLane. The SRAM macros, the SBUS mux,
+`torv_cpu`, the block that goes through LibreLane. The SRAM macros, the SBUS mux,
 the APB bridge and the UART sit at SoC level.
 
-![rv32im_core pipeline](docs/img/pipeline.svg)
+![torv_core pipeline](docs/img/pipeline.svg)
 
-- **IF:** `pc_unit` and the pipelined fetch master; one instruction per cycle from a
+- **IF:** `torv_pc_unit` and the pipelined fetch master; one instruction per cycle from a
   zero-wait slave.
 - **ID:** decode, immediate generation, register-file read, and the hazard unit.
   - The forwarding selects for the next EX are computed here, from next-state pipeline
@@ -58,7 +58,7 @@ the APB bridge and the UART sit at SoC level.
   - operand forwarding (from EX/MEM and MEM/WB);
   - ALU and branch resolution (a taken branch or jump costs 2 cycles);
   - the multiply/divide unit;
-  - the AGU, `addr_decode` and LSU, which issue the AHB address phase.
+  - the AGU, `torv_addr_decode` and LSU, which issue the AHB address phase.
 - **MEM:** the AHB data phase and load alignment. The MEM/WB result is selected before the
   register, so WB is a plain write.
 
@@ -68,7 +68,7 @@ Details: [spec/RV32IM_Current_Implementation.md](spec/RV32IM_Current_Implementat
 
 | Path | Contents |
 |------|----------|
-| `rtl/` | Core (`rv32im_core` and its units), AHB masters (`rv32im_ahb_fetch`, `rv32im_ahb_dport`), `rv32im_ahb_top`, SoC (`torv_soc_top`, `torv_ahb_sram`), `filelist.f` |
+| `rtl/` | Core (`torv_core` and its units), AHB masters (`torv_ahb_fetch`, `torv_ahb_dport`), `torv_cpu`, SoC (`torv_soc`, `torv_ahb_sram`), `filelist.f` |
 | `sim/` | Testbench `tb_torv_soc.sv`, `Makefile` shortcuts, [SIM_README.md](sim/SIM_README.md) |
 | `tests/core/asm/` | Directed assembly tests, `link.ld`, per-case `.plusargs` |
 | `tests/periph/` | Peripheral tests (UART) |
@@ -192,7 +192,7 @@ Representative cycle counts (v0.6):
 
 ## Physical implementation (IHP SG13G2, LibreLane)
 
-The implemented block is `rv32im_ahb_top`: the core plus its three AHB-Lite masters. The SoC
+The implemented block is `torv_cpu`: the core plus its three AHB-Lite masters. The SoC
 SRAM macros and peripherals are not part of this block.
 
 - Configuration: [librelane/config.yaml](librelane/config.yaml).
@@ -244,7 +244,7 @@ closing them.
 
 <table>
 <tr>
-<td width="50%"><img src="docs/img/layout_full.png" alt="Final layout of rv32im_ahb_top"></td>
+<td width="50%"><img src="docs/img/layout_full.png" alt="Final layout of torv_cpu"></td>
 <td width="50%"><img src="docs/img/placement_modules.svg" alt="Placement by module"></td>
 </tr>
 <tr>

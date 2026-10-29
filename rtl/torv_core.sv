@@ -6,7 +6,7 @@
 // load-use, mul/div occupancy, and bus stalls; forwarding covers EX/MEM
 // and MEM/WB to EX.
 
-module rv32im_core (
+module torv_core (
   input  logic        clk,
   input  logic        rst_n,
   input  logic        ibus_ready,
@@ -52,7 +52,7 @@ module rv32im_core (
 
   assign pc_next = ex_branch_taken ? ex_branch_target : pc_plus4;
 
-  pc_unit u_pc (
+  torv_pc_unit u_pc (
     .clk(clk),
     .rst_n(rst_n),
     .stall_pc(stall_pc_h),
@@ -102,7 +102,7 @@ module rv32im_core (
   logic        d_is_jalr;
   logic        d_illegal;
 
-  decoder u_dec (
+  torv_decoder u_dec (
     .opcode(if_id_inst[6:0]),
     .funct3(if_id_inst[14:12]),
     .funct7(if_id_inst[31:25]),
@@ -123,7 +123,7 @@ module rv32im_core (
   );
 
   logic [31:0] d_imm;
-  imm_gen u_imm (
+  torv_imm_gen u_imm (
     .inst(if_id_inst),
     .imm_type(d_imm_type),
     .imm(d_imm)
@@ -135,7 +135,7 @@ module rv32im_core (
   logic [4:0]  mem_wb_rd;
   logic [31:0] wb_wdata;
 
-  regfile u_rf (
+  torv_regfile u_rf (
     .clk(clk),
     .ra1(if_id_inst[19:15]),
     .ra2(if_id_inst[24:20]),
@@ -342,7 +342,7 @@ module rv32im_core (
     mem_wb_rd_d        = stall_mem_wb ? mem_wb_rd        : ex_mem_rd;
   end
 
-  forwarding_unit u_fwd (
+  torv_forwarding_unit u_fwd (
     .ex_mem_regwrite(ex_mem_reg_write_d),
     .ex_mem_memread(ex_mem_mem_read_d),
     .ex_mem_rd(ex_mem_rd_d),
@@ -369,7 +369,7 @@ module rv32im_core (
   // forwarding decision on the current pipeline state.
   logic [1:0] forward_a_chk;
   logic [1:0] forward_b_chk;
-  forwarding_unit u_fwd_chk (
+  torv_forwarding_unit u_fwd_chk (
     .ex_mem_regwrite(ex_mem_reg_write),
     .ex_mem_memread(ex_mem_mem_read),
     .ex_mem_rd(ex_mem_rd),
@@ -420,7 +420,7 @@ module rv32im_core (
   assign alu_in_b = id_ex_alu_src ? id_ex_imm : fb_val;
 
   logic [3:0] alu_ctrl;
-  alu_control u_aluctl (
+  torv_alu_ctrl u_aluctl (
     .is_lui(id_ex_is_lui),
     .alu_op(id_ex_alu_op),
     .funct3(id_ex_funct3),
@@ -430,7 +430,7 @@ module rv32im_core (
 
   logic [31:0] alu_y;
   logic        alu_zero;
-  alu u_alu (
+  torv_alu u_alu (
     .alu_ctrl(alu_ctrl),
     .a(alu_in_a),
     .b(alu_in_b),
@@ -441,7 +441,7 @@ module rv32im_core (
   logic        md_busy;
   logic        md_ready;
   logic [31:0] md_result;
-  muldiv_unit u_md (
+  torv_muldiv_unit u_md (
     .clk(clk),
     .rst_n(rst_n),
     .flush(flush),
@@ -492,12 +492,12 @@ module rv32im_core (
   // this adder drives the AHB address-phase outputs).
   assign mem_addr_ex = fa_val + id_ex_imm;
 
-  addr_decode u_ad (
+  torv_addr_decode u_ad (
     .addr(mem_addr_ex),
     .use_sbus(use_sbus_ex)
   );
 
-  lsu u_lsu (
+  torv_lsu u_lsu (
     .mem_read(id_ex_mem_read),
     .mem_write(id_ex_mem_write),
     .addr(mem_addr_ex),
@@ -572,7 +572,7 @@ module rv32im_core (
   assign dbus_wdata = ex_mem_store_data;
   assign sbus_wdata = ex_mem_store_data;
 
-  hazard_unit u_hz (
+  torv_hazard_unit u_hz (
     .id_ex_mem_read(id_ex_mem_read),
     .id_ex_rd(id_ex_rd),
     .if_id_inst(if_id_inst),

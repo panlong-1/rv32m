@@ -1,7 +1,7 @@
 // RV32M multiply/divide (spec §3 EX, §9.1)
 // MUL* uses one shared 33x33 multiplier over two cycles. DIV/REM uses an
 // iterative restoring divider to avoid synthesizing a large combinational / %.
-module muldiv_unit (
+module torv_muldiv_unit (
   input  logic        clk,
   input  logic        rst_n,
   input  logic        flush,

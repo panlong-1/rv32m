@@ -1,4 +1,4 @@
-# TORV SoC unified regression (tb_torv_soc + torv_soc_top)
+# TORV SoC unified regression (tb_torv_soc + torv_soc)
 # Core asm + peripheral replay cases; no Harvard-only builtin.
 smoke        asm      tests/core/asm/smoke.S       5000
 alu          asm      tests/core/asm/alu.S         5000

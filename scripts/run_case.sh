@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unified single-case simulation — TORV SoC (tb_torv_soc + torv_soc_top).
+# Unified single-case simulation — TORV SoC (tb_torv_soc + torv_soc).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

@@ -1,5 +1,5 @@
 // PC register and next-PC mux (spec §3 stage IF, §5)
-module pc_unit (
+module torv_pc_unit (
   input  logic        clk,
   input  logic        rst_n,
   input  logic        stall_pc,

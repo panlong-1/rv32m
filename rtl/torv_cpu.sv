@@ -1,5 +1,5 @@
 // RV32IM core wrapped with independent I/D/S AHB-Lite master ports.
-module rv32im_ahb_top (
+module torv_cpu (
   input  logic        hclk,
   input  logic        hresetn,
 
@@ -59,7 +59,7 @@ module rv32im_ahb_top (
   logic [31:0] sbus_wdata;
   logic [31:0] sbus_rdata;
 
-  rv32im_core u_core (
+  torv_core u_core (
     .clk(hclk),
     .rst_n(hresetn),
     .ibus_ready(ibus_ready),
@@ -84,7 +84,7 @@ module rv32im_ahb_top (
     .sbus_rdata(sbus_rdata)
   );
 
-  rv32im_ahb_fetch u_i_fetch (
+  torv_ahb_fetch u_i_fetch (
     .hclk(hclk),
     .hresetn(hresetn),
     .req_ready(ibus_ready),
@@ -103,7 +103,7 @@ module rv32im_ahb_top (
     .hresp(i_hresp)
   );
 
-  rv32im_ahb_dport u_d_port (
+  torv_ahb_dport u_d_port (
     .hclk(hclk),
     .hresetn(hresetn),
     .req_valid(dbus_valid),
@@ -126,7 +126,7 @@ module rv32im_ahb_top (
     .hresp(d_hresp)
   );
 
-  rv32im_ahb_dport u_s_port (
+  torv_ahb_dport u_s_port (
     .hclk(hclk),
     .hresetn(hresetn),
     .req_valid(sbus_valid),

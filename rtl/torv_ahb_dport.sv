@@ -8,7 +8,7 @@
 // presents it when the instruction will leave EX on that same edge, so every
 // load/store is issued exactly once (no replay of peripheral side effects).
 // While HREADY is low the core freezes, keeping the address phase stable.
-module rv32im_ahb_dport (
+module torv_ahb_dport (
   input  logic        hclk,
   input  logic        hresetn,
 

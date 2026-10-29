@@ -1,5 +1,5 @@
 // Address map for LSU routing (spec §13.2)
-module addr_decode (
+module torv_addr_decode (
   input  logic [31:0] addr,
   output logic        use_sbus
 );

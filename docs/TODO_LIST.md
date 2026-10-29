@@ -11,7 +11,7 @@ Open items as of `v0.7-open-flow`. Completed items are kept at the end for refer
   - [ ] Replace the generic 2 ns I/O budget in `librelane/constraints.sdc` with the real SoC
         interconnect and SRAM wrapper timing.
   - [ ] Alternatively, sign off the slow corner at 12.5 ns (80 MHz).
-- [ ] Implement `torv_soc_top` with the three IHP SRAM macros (macro placement, PDN, halos)
+- [ ] Implement `torv_soc` with the three IHP SRAM macros (macro placement, PDN, halos)
       for a full SoC GDS. Size the SRAMs to the tape-out area budget (one 1024x32 macro is
       ≈ 140k µm²).
 - [ ] Switching-activity-based power (SAIF/VCD from regression) instead of default activity.

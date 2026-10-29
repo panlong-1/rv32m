@@ -2,7 +2,7 @@
 // PoliTO-oriented student open-source RV32IM platform.
 //
 // Subsystems (single integration top):
-//   - rv32im_ahb_top     (CPU + IBUS/DBUS/SBUS AHB-Lite masters)
+//   - torv_cpu     (CPU + IBUS/DBUS/SBUS AHB-Lite masters)
 //   - torv_ahb_sram      (IMEM, DMEM, SBUS SRAM; IHP SG13G2 RM_IHPSG13_1P macros)
 //   - AHB_APB_BRIDGE     (SoCBUS, SBUS peripheral window)
 //   - apb_uart_sv        (PULP UART @ 0x4000_1000)
@@ -19,7 +19,7 @@
 // the address phase is accepted (HREADY high).
 `timescale 1ns / 1ps
 
-module torv_soc_top #(
+module torv_soc #(
   // SRAM depth in 32-bit words: 256, 512 or 1024 (one IHP macro each)
   parameter int IMEM_WORDS = 1024,
   parameter int DMEM_WORDS = 1024,
@@ -76,7 +76,7 @@ module torv_soc_top #(
   logic        s_hready;
   logic        s_hresp;
 
-  rv32im_ahb_top u_cpu (
+  torv_cpu u_cpu (
     .hclk(hclk),
     .hresetn(hresetn),
     .i_haddr(i_haddr),

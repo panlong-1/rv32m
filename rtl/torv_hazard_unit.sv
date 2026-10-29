@@ -7,7 +7,7 @@
 // draining and a load/store is never issued twice.
 //
 // Priority: bus_stall > flush > div_busy > load_use > IBUS not ready.
-module hazard_unit (
+module torv_hazard_unit (
   input  logic        id_ex_mem_read,
   input  logic [4:0]  id_ex_rd,
   input  logic [31:0] if_id_inst,

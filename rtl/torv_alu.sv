@@ -1,5 +1,5 @@
 // Integer ALU (spec §3 EX)
-module alu (
+module torv_alu (
   input  logic [3:0]  alu_ctrl,
   input  logic [31:0] a,
   input  logic [31:0] b,

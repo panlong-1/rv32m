@@ -1,4 +1,4 @@
-# rv32im_ahb_top on IHP SG13G2 (units: ns, pF)
+# torv_cpu on IHP SG13G2 (units: ns, pF)
 # I/O delays are a generic 2 ns budget for the AHB slaves outside the core;
 # tighten or relax them to the real SoC interconnect / SRAM wrapper timing.
 

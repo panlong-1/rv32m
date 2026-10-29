@@ -11,7 +11,7 @@ module tb_torv_soc;
   logic [4:0]  uart_tx_fifo_depth_max;
   logic [7:0]  uart_rbr_read_count;
 
-  torv_soc_top dut (
+  torv_soc dut (
     .hclk(hclk),
     .hresetn(hresetn),
     .ibus_stall_hold(ibus_stall_hold),

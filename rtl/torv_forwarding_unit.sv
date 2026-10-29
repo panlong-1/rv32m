@@ -1,5 +1,5 @@
 // Forwarding EX/MEM and MEM/WB → EX (spec §10.1)
-module forwarding_unit (
+module torv_forwarding_unit (
   input  logic       ex_mem_regwrite,
   input  logic       ex_mem_memread,
   input  logic [4:0] ex_mem_rd,

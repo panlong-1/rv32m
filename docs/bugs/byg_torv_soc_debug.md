@@ -1,11 +1,11 @@
 # BYG: TORV SoC Integration Debug Record
 
 Date: 2026-05-23  
-Scope: `torv_soc_top`, `tb_torv_soc`, CPU memory replay / hazard control, TORV address map.
+Scope: `torv_soc`, `tb_torv_soc`, CPU memory replay / hazard control, TORV address map.
 
 ## Summary
 
-TORV SoC integration initially reproduced several failures after moving from legacy `core` / `ahb` testbenches into the single `torv_soc_top` + `tb_torv_soc` path.
+TORV SoC integration initially reproduced several failures after moving from legacy `core` / `ahb` testbenches into the single `torv_soc` + `tb_torv_soc` path.
 
 Final verification:
 
@@ -56,7 +56,7 @@ Symptom:
 
 Cause:
 
-- `hazard_unit` treated a completed load like a store/ALU op during `ibus_stall`, holding or bubbling `EX/MEM` in a way that prevented the returned data from reaching `MEM/WB`.
+- `torv_hazard_unit` treated a completed load like a store/ALU op during `ibus_stall`, holding or bubbling `EX/MEM` in a way that prevented the returned data from reaching `MEM/WB`.
 
 Initial fix (superseded by BYG-006):
 
@@ -81,7 +81,7 @@ Symptom:
 
 Cause:
 
-- After a store beat completed and `rv32im_core` masked `sbus_valid`, `hazard_unit` still held `EX/MEM` because `ibus_stall` remained true.
+- After a store beat completed and `torv_core` masked `sbus_valid`, `torv_hazard_unit` still held `EX/MEM` because `ibus_stall` remained true.
 
 Fix:
 
@@ -104,7 +104,7 @@ Cause:
 
 Fix:
 
-- `rv32im_core` drops `dbus_valid` / `sbus_valid` after any completed beat while `EX/MEM` is held (`dbus_completed` / `sbus_completed` without `ex_mem_mem_write` filter). See BYG-005.
+- `torv_core` drops `dbus_valid` / `sbus_valid` after any completed beat while `EX/MEM` is held (`dbus_completed` / `sbus_completed` without `ex_mem_mem_write` filter). See BYG-005.
 
 Evidence:
 
@@ -148,7 +148,7 @@ Fix:
 - **Completed load** (`ex_mem_mem_read && dbus_done/sbus_done`): `stall_ex_mem = 0` so `MEM/WB` can retire while `ID/EX` stays frozen.
 - **Completed store** during `ibus_stall`: `bubble_ex_mem` with `stall_ex_mem = 0` so the bubble clears `EX/MEM` (BYG-003).
 - Pending beat (`!dbus_done && !sbus_done`): `stall_ex_mem = (dbus_valid || sbus_valid || stall_id_ex)`.
-- `rv32im_core`: clear `dbus_completed` / `sbus_completed` only after `EX/MEM` has no matching mem op.
+- `torv_core`: clear `dbus_completed` / `sbus_completed` only after `EX/MEM` has no matching mem op.
 
 Evidence:
 
@@ -170,11 +170,11 @@ Trace-based dup check (no waves): `./scripts/check_hazard_dup_trace.py --case <n
 
 ## Code Locations
 
-- `rtl/torv_soc_top.sv`: TORV address map and UART APB window.
+- `rtl/torv_soc.sv`: TORV address map and UART APB window.
 - `rtl/torv_ahb_sram.sv`: low-16-bit SRAM indexing compatibility with legacy tests.
-- `rtl/hazard_unit.sv`: `stall_front` / BYG-006 insn-dup fix.
-- `rtl/rv32im_core.sv`: load/store replay guard on DBUS/SBUS valid (BYG-005).
-- `rtl/torv_soc_top.sv`: `uart_rbr_read_count` for directed RX replay tests; see file header for AHB `HSEL`/mux caveats vs pipelined masters.
+- `rtl/torv_hazard_unit.sv`: `stall_front` / BYG-006 insn-dup fix.
+- `rtl/torv_core.sv`: load/store replay guard on DBUS/SBUS valid (BYG-005).
+- `rtl/torv_soc.sv`: `uart_rbr_read_count` for directed RX replay tests; see file header for AHB `HSEL`/mux caveats vs pipelined masters.
 - `sim/tb_torv_soc.sv`: TORV single testbench, replay expectation, directed bus stalls.
 - `tests/periph/apb_uart_sv/*.S`: UART base at `0x4000_1000`.
 - `tests/core/asm/hazard_sbus_replay_smoke.S`: TORV UART replay smoke.

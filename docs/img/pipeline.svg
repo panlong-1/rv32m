@@ -22,7 +22,7 @@
     <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8a8984"/></marker>
   </defs>
   <rect class="bg" width="920" height="480"/>
-  <text class="t" x="20" y="26" font-size="16" font-weight="bold">rv32im_core pipeline</text>
+  <text class="t" x="20" y="26" font-size="16" font-weight="bold">torv_core pipeline</text>
 
   <!-- stage bands -->
   <rect class="st" x="20"  y="95" width="140" height="300" rx="6"/>

@@ -1,6 +1,6 @@
 # apb_uart_sv (PULP)
 
-Map: TORV SBUS `0x4000_1000` (12-bit APB window). Wired in `rtl/torv_soc_top.sv` through SoCBUS `AHB_APB_BRIDGE`.
+Map: TORV SBUS `0x4000_1000` (12-bit APB window). Wired in `rtl/torv_soc.sv` through SoCBUS `AHB_APB_BRIDGE`.
 
 | Case | File | Purpose |
 |------|------|---------|

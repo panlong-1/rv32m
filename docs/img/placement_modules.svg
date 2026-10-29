@@ -6528,7 +6528,7 @@
 <rect x="688" y="34" width="8" height="8" fill="#9D9D9D" fill-opacity="0.91"/>
 <rect x="688" y="26" width="8" height="8" fill="#9D9D9D" fill-opacity="0.44"/>
 </g>
-<text x="10" y="20" font-weight="bold">rv32im_ahb_top placement by module (704 × 722 µm)</text>
+<text x="10" y="20" font-weight="bold">torv_cpu placement by module (704 × 722 µm)</text>
 <rect x="728.63" y="38" width="16" height="16" fill="#2a78d6"/>
 <text x="752.63" y="51">Register file (5623)</text>
 <rect x="728.63" y="62" width="16" height="16" fill="#eb6834"/>

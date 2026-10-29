@@ -1,5 +1,5 @@
 // ALU control — 4-bit ALU operation (spec §7)
-module alu_control (
+module torv_alu_ctrl (
   input  logic       is_lui,
   input  logic [1:0] alu_op,
   input  logic [2:0] funct3,

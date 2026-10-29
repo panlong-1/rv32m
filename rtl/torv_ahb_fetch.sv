@@ -12,7 +12,7 @@
 // HTRANS is IDLE while HREADY is low: no NONSEQ is presented during a wait
 // state, so HADDR may follow the core freely and the extended data phase
 // (and the slave's registered address) stay untouched.
-module rv32im_ahb_fetch (
+module torv_ahb_fetch (
   input  logic        hclk,
   input  logic        hresetn,
 

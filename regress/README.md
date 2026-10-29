@@ -8,7 +8,7 @@
 
 `scripts/regress.sh` is a thin wrapper around `regress/bin/run_regress.py`. Every case runs
 through `scripts/run_case.sh` on the TORV SoC testbench (`sim/tb_torv_soc.sv` +
-`rtl/torv_soc_top.sv`) with Verilator.
+`rtl/torv_soc.sv`) with Verilator.
 
 ## Commands
 

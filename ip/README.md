@@ -19,7 +19,7 @@ source scripts/env.sh
 
 `--target core|ahb` only changes the regression case list file; simulation always uses TORV SoC (`tb_torv_soc`).
 
-Wiring is in `rtl/torv_soc_top.sv` (no `ip/bus/` or wrapper modules in this repo).
+Wiring is in `rtl/torv_soc.sv` (no `ip/bus/` or wrapper modules in this repo).
 
 ## Fetch
 

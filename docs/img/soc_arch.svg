@@ -19,13 +19,13 @@
   </style>
   <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8a8984"/></marker></defs>
   <rect class="bg" width="880" height="470"/>
-  <text class="t" x="20" y="28" font-size="16" font-weight="bold">TORV SoC (torv_soc_top)</text>
+  <text class="t" x="20" y="28" font-size="16" font-weight="bold">TORV SoC (torv_soc)</text>
 
   <rect class="ll" x="20" y="50" width="405" height="400" rx="8"/>
-  <text class="s" x="32" y="70" font-size="12">rv32im_ahb_top — the block implemented with LibreLane</text>
+  <text class="s" x="32" y="70" font-size="12">torv_cpu — the block implemented with LibreLane</text>
 
   <rect class="core" x="38" y="85" width="170" height="345" rx="6"/>
-  <text class="t" x="123" y="112" text-anchor="middle" font-weight="bold">rv32im_core</text>
+  <text class="t" x="123" y="112" text-anchor="middle" font-weight="bold">torv_core</text>
   <g class="s" font-size="12" text-anchor="middle">
     <text x="123" y="132">RV32IM, 5-stage</text>
     <text x="123" y="150">IF ID EX MEM WB</text>
@@ -41,15 +41,15 @@
   </g>
 
   <rect class="mst" x="235" y="95" width="172" height="70" rx="6"/>
-  <text class="t" x="321" y="122" text-anchor="middle" font-weight="bold">rv32im_ahb_fetch</text>
+  <text class="t" x="321" y="122" text-anchor="middle" font-weight="bold">torv_ahb_fetch</text>
   <text class="s" x="321" y="142" text-anchor="middle" font-size="12">IBUS · 1 fetch / cycle</text>
 
   <rect class="mst" x="235" y="215" width="172" height="70" rx="6"/>
-  <text class="t" x="321" y="242" text-anchor="middle" font-weight="bold">rv32im_ahb_dport</text>
+  <text class="t" x="321" y="242" text-anchor="middle" font-weight="bold">torv_ahb_dport</text>
   <text class="s" x="321" y="262" text-anchor="middle" font-size="12">DBUS · addr EX, data MEM</text>
 
   <rect class="mst" x="235" y="335" width="172" height="70" rx="6"/>
-  <text class="t" x="321" y="362" text-anchor="middle" font-weight="bold">rv32im_ahb_dport</text>
+  <text class="t" x="321" y="362" text-anchor="middle" font-weight="bold">torv_ahb_dport</text>
   <text class="s" x="321" y="382" text-anchor="middle" font-size="12">SBUS · addr EX, data MEM</text>
 
   <path class="w" d="M208,130 H235"/><path class="w" d="M208,250 H235"/><path class="w" d="M208,370 H235"/>

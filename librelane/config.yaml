@@ -6,25 +6,25 @@ meta:
   flow: Classic
 
 PDK: ihp-sg13g2
-DESIGN_NAME: rv32im_ahb_top
+DESIGN_NAME: torv_cpu
 
-# bus_if.sv is typedef-only and unused by this top
+# torv_bus_types.sv is typedef-only and unused by this top
 VERILOG_FILES:
-  - dir::../rtl/addr_decode.sv
-  - dir::../rtl/pc_unit.sv
-  - dir::../rtl/regfile.sv
-  - dir::../rtl/imm_gen.sv
-  - dir::../rtl/decoder.sv
-  - dir::../rtl/alu_control.sv
-  - dir::../rtl/alu.sv
-  - dir::../rtl/muldiv_unit.sv
-  - dir::../rtl/forwarding_unit.sv
-  - dir::../rtl/hazard_unit.sv
-  - dir::../rtl/lsu.sv
-  - dir::../rtl/rv32im_core.sv
-  - dir::../rtl/rv32im_ahb_dport.sv
-  - dir::../rtl/rv32im_ahb_fetch.sv
-  - dir::../rtl/rv32im_ahb_top.sv
+  - dir::../rtl/torv_addr_decode.sv
+  - dir::../rtl/torv_pc_unit.sv
+  - dir::../rtl/torv_regfile.sv
+  - dir::../rtl/torv_imm_gen.sv
+  - dir::../rtl/torv_decoder.sv
+  - dir::../rtl/torv_alu_ctrl.sv
+  - dir::../rtl/torv_alu.sv
+  - dir::../rtl/torv_muldiv_unit.sv
+  - dir::../rtl/torv_forwarding_unit.sv
+  - dir::../rtl/torv_hazard_unit.sv
+  - dir::../rtl/torv_lsu.sv
+  - dir::../rtl/torv_core.sv
+  - dir::../rtl/torv_ahb_dport.sv
+  - dir::../rtl/torv_ahb_fetch.sv
+  - dir::../rtl/torv_cpu.sv
 VERILOG_INCLUDE_DIRS:
   - dir::../rtl
 # SystemVerilog frontend (unique case, enums, always_ff)

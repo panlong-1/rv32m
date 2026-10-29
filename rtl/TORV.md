@@ -6,8 +6,8 @@
 
 | Module | Role |
 |--------|------|
-| `torv_soc_top` | SoC integration (CPU, SRAM, AHB→APB, UART) |
-| `rv32im_ahb_top` | RV32IM + three AHB-Lite masters |
+| `torv_soc` | SoC integration (CPU, SRAM, AHB→APB, UART) |
+| `torv_cpu` | RV32IM + three AHB-Lite masters |
 | `torv_ahb_sram` | Zero-wait AHB-Lite wrapper around an IHP SG13G2 SRAM macro |
 | `AHB_APB_BRIDGE` | SoCBUS (third-party) |
 | `apb_uart_sv` | PULP UART @ `0x4000_1000` |
@@ -39,7 +39,7 @@ Full map: [docs/torv_address_map.md](../docs/torv_address_map.md). The IBUS and 
 
 ## Implementation
 
-`rv32im_ahb_top` (the core and its AHB masters) goes through RTL-to-GDS on IHP SG13G2 with
+`torv_cpu` (the core and its AHB masters) goes through RTL-to-GDS on IHP SG13G2 with
 LibreLane (`make -C librelane flow`). The SoC level with the SRAM macros is not implemented
 yet. See [docs/open_source_flow.md](../docs/open_source_flow.md).
 

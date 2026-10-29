@@ -1,5 +1,5 @@
 // Load/store unit — DBUS vs SBUS routing (spec §3 MEM, §13)
-module lsu (
+module torv_lsu (
   input  logic        mem_read,
   input  logic        mem_write,
   input  logic [31:0] addr,

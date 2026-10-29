@@ -1,5 +1,5 @@
 // Main decoder — Phase 1 subset (spec §6–7)
-module decoder (
+module torv_decoder (
   input  logic [6:0] opcode,
   input  logic [2:0] funct3,
   input  logic [6:0] funct7,

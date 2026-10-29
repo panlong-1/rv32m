@@ -1,6 +1,6 @@
 // Harvard IBUS / DBUS / SBUS bundles (spec §13.3)
-`ifndef TORV_BUS_IF_SV
-`define TORV_BUS_IF_SV
+`ifndef TORV_BUS_TYPES_SV
+`define TORV_BUS_TYPES_SV
 
 typedef struct packed {
   logic        valid;
